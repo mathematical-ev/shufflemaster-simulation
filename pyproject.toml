@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "shufflemaster-sim"
+version = "0.1.0"
+description = "Simulation tools for blackjack-like games and card-source analysis."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "shufflemaster-sim contributors" },
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "mypy",
+  "pytest",
+  "pytest-cov",
+  "ruff",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+  "B",
+  "E",
+  "F",
+  "I",
+  "N",
+  "UP",
+  "W",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["shufflemaster_sim"]
+strict = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+warn_unreachable = true
