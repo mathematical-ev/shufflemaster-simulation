@@ -5,6 +5,8 @@ from shufflemaster_sim.card_sources import (
     FiniteShoeCardSource,
     IidRandomCardSource,
     ManualShoeCardSource,
+    One2SixCardSource,
+    One2SixConfig,
     ScriptedCardSource,
 )
 from shufflemaster_sim.cards import RANKS, SUITS, Card, Rank, Suit, blackjack_value
@@ -21,6 +23,8 @@ __all__ = [
     "FiniteShoeCardSource",
     "IidRandomCardSource",
     "ManualShoeCardSource",
+    "One2SixCardSource",
+    "One2SixConfig",
     "Rank",
     "ScriptedCardSource",
     "SimulationConfig",

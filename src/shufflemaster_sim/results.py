@@ -64,6 +64,9 @@ class SimulationResult:
     edge_per_total_wager: float
     final_bankroll_delta: float
     shuffle_count: int | None = None
+    output_buffer_size: int | None = None
+    ejection_count: int | None = None
+    fallback_ejection_count: int | None = None
 
     def as_round_records(self) -> list[dict[str, Any]]:
         """Return round results as plain records for later analysis."""
@@ -224,9 +227,6 @@ class ResultRecorder:
         elif round_net < 0:
             result.current_loss_streak += 1
             result.current_win_streak = 0
-        else:
-            result.current_win_streak = 0
-            result.current_loss_streak = 0
 
         result.max_win_streak = max(
             result.max_win_streak,

@@ -51,6 +51,17 @@ def test_manual_shoe_simulation_reports_shuffle_count() -> None:
     assert result.shuffle_count > 0
 
 
+def test_star_blackjack_baseline_runs_with_one2six_source() -> None:
+    result = run_star_blackjack_baseline(
+        SimulationConfig(rounds=10, seed=42, card_source="one2six")
+    )
+
+    assert result.rounds_played == 10
+    assert result.output_buffer_size is not None
+    assert result.ejection_count is not None
+    assert result.fallback_ejection_count is not None
+
+
 def test_star_blackjack_baseline_is_reproducible_with_same_seed() -> None:
     first = run_star_blackjack_baseline(SimulationConfig(rounds=100, seed=42))
     second = run_star_blackjack_baseline(SimulationConfig(rounds=100, seed=42))

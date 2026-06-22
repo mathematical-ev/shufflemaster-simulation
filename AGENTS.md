@@ -23,8 +23,8 @@ specified and tests exist.
 - Prefer small pure functions and typed dataclasses.
 - Star rules must be implemented from explicit source material, not memory.
 - The published strategy is an approximate baseline only.
-- The current runnable card sources are IID random, generic finite shoe, and
-  manual shoe.
+- The current runnable card sources are IID random, generic finite shoe,
+  manual shoe, and a configurable One2Six-style source model.
 - Ordered discard-rack collection and shuffling-device return timing are
   explicitly modelled because they will matter for One2Six simulation.
 - Physical card identity is critical for One2Six return-time analysis.
@@ -34,8 +34,22 @@ specified and tests exist.
 - Game rules must not depend on how a card source works internally.
 - Manual shoe and One2Six must remain separate concepts.
 - Do not model a continuous shuffler as a finite shoe.
+- Treat `One2SixCardSource` defaults as explicit modelling assumptions, not
+  claims about proprietary device internals.
+- Preserve One2Six telemetry and invariant checks when changing source logic.
+- Accepted discard order matters for return-time analysis; do not reorder cards
+  unless a tested card-source rule explicitly does so.
 - Future multi-box work must allow independent bet amounts per box.
 - Per-box results and streaks must remain independent.
+- Pushes do not break win/loss streaks; treat them as neutral ignored outcomes
+  for streak continuation.
+- Keep experiment framework code separate from the core engine.
+- Core modules under `src/shufflemaster_sim/` must not import experiment
+  modules.
+- Inter-arrival time under IID should be compared to a geometric distribution.
+- Poisson approximations are suitable for fixed-window counts, not
+  inter-arrival time.
+- Always validate the IID baseline before interpreting One2Six output.
 
 ## Important Directories
 
@@ -43,6 +57,8 @@ specified and tests exist.
 - `tests/`: pytest tests.
 - `.vscode/`: tracked workspace settings for the local `.venv`.
 - `scripts/`: small CLI entry points only; the engine belongs in `src/`.
+- `experiments/`: experiment metrics, plotting, runners, and generated-output
+  handling outside the core engine.
 
 ## Setup, Test, and Lint Commands
 
@@ -67,10 +83,12 @@ python -m mypy src
 ## Do-Not Rules
 
 - Do not add heavy dependencies without justification.
-- Do not implement One2Six / Shuffle Master logic until it is explicitly
-  requested.
+- Do not extend One2Six / Shuffle Master logic beyond explicitly requested and
+  tested source-model assumptions.
 - Do not implement Star Blackjack, Pontoon, or other casino rules from memory.
   Leave placeholders until rules are explicitly specified.
 - Do not make claims about exploitability without simulation evidence.
+- Do not treat one run's profit as evidence of exploitability.
 - Future work should include a solver-generated exact Star strategy.
-- Future work should include One2Six card sources.
+- Future work should validate and calibrate One2Six source assumptions before
+  making any exploitability claims.

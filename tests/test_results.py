@@ -171,7 +171,7 @@ def test_win_win_loss_tracks_win_and_current_loss_streaks() -> None:
     assert box.current_loss_streak == 1
 
 
-def test_loss_loss_push_loss_tracks_loss_streak_reset() -> None:
+def test_loss_loss_push_loss_tracks_loss_streak_through_push() -> None:
     recorder = ResultRecorder(base_bet=10.0, box_count=1)
     recorder.record_round(settled_table(0, -10.0))
     recorder.record_round(settled_table(1, -10.0))
@@ -180,19 +180,19 @@ def test_loss_loss_push_loss_tracks_loss_streak_reset() -> None:
 
     box = recorder.build_result().box_results[0]
 
-    assert box.max_loss_streak == 2
-    assert box.current_loss_streak == 1
+    assert box.max_loss_streak == 3
+    assert box.current_loss_streak == 3
     assert box.current_win_streak == 0
 
 
-def test_push_resets_both_current_streaks() -> None:
+def test_push_does_not_break_current_streaks() -> None:
     recorder = ResultRecorder(base_bet=10.0, box_count=1)
     recorder.record_round(settled_table(0, 10.0))
     recorder.record_round(settled_table(1, 0.0))
 
     box = recorder.build_result().box_results[0]
 
-    assert box.current_win_streak == 0
+    assert box.current_win_streak == 1
     assert box.current_loss_streak == 0
 
 

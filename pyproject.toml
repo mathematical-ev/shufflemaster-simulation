@@ -20,6 +20,9 @@ dev = [
   "pytest-cov",
   "ruff",
 ]
+analysis = [
+  "matplotlib",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
