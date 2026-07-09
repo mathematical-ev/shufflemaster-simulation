@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 """Approximate published H17 multi-deck strategy constrained by house rules."""
 
 from typing import Final

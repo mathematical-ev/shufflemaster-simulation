@@ -290,3 +290,11 @@ python scripts/run_one2six_recurrence_sensitivity.py \
   --seed 42 \
   --output-dir experiments/outputs/one2six_recurrence_sensitivity_1m_seed42
 ```
+
+## License
+
+This project is licensed under the GNU General Public License v3.0 or later.
+
+Copyright (C) 2026 Andrew Roudenko.
+
+See [LICENSE](LICENSE) for the full license text.

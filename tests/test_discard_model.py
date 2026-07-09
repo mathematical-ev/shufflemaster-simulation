@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
 

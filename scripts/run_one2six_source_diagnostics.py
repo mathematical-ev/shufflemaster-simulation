@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 """Run a direct One2Six card-source diagnostic."""
 
 from argparse import ArgumentParser

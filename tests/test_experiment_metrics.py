@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 from experiments.metrics import (
     geometric_probabilities,
     hilo_value,

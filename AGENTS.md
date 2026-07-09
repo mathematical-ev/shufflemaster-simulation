@@ -103,6 +103,22 @@ python -m mypy src
 - Prefer protocols for replaceable simulation components.
 - Keep runtime dependencies minimal.
 
+## License policy
+
+Repository source code is licensed under GPL-3.0-or-later.
+
+New Python source files should include:
+
+```python
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+```
+
+Generated experiment outputs under `experiments/outputs/` are not source code
+and should remain untracked unless explicitly needed.
+
+Do not copy incompatible third-party code into this repository.
+
 ## Do-Not Rules
 
 - Do not add heavy dependencies without justification.

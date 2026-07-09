@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 """Player action types for blackjack-like games."""
 
 from dataclasses import dataclass

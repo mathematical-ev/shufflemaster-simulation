@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 """Card source abstractions for deterministic and stochastic draws."""
 
 from collections import deque

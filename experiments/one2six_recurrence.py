@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 """One2Six-style physical-card recurrence experiment."""
 
 from __future__ import annotations

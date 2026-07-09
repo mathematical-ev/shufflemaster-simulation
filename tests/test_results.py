@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 from shufflemaster_sim.cards import Card
 from shufflemaster_sim.results import ResultRecorder
 from shufflemaster_sim.state import BoxState, DealerState, HandState, TableState

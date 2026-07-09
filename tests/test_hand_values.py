@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 from shufflemaster_sim.cards import Card, Rank
 from shufflemaster_sim.hand_values import (
     hand_value,

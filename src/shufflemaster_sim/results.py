@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 Andrew Roudenko
+
 """Result records and aggregation for simulations."""
 
 from dataclasses import dataclass, field

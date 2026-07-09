@@ -8,8 +8,12 @@ version = "0.1.0"
 description = "Simulation tools for blackjack-like games and card-source analysis."
 readme = "README.md"
 requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
 authors = [
   { name = "shufflemaster-sim contributors" },
+]
+classifiers = [
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
 ]
 dependencies = []
 
