@@ -3,7 +3,7 @@ import pytest
 from shufflemaster_sim.actions import ActionType
 from shufflemaster_sim.card_sources import ScriptedCardSource
 from shufflemaster_sim.cards import Card, Rank
-from shufflemaster_sim.games.star_blackjack import StarBlackjackGame
+from shufflemaster_sim.games.casino_blackjack import CasinoBlackjackGame
 from shufflemaster_sim.hand_values import hand_value, is_natural_blackjack
 from shufflemaster_sim.state import HandState
 
@@ -20,8 +20,8 @@ def card(rank: Rank, draw_id: int = 0) -> Card:
 def make_dealt_table(
     player_cards: list[Rank],
     dealer_cards: list[Rank],
-) -> tuple[StarBlackjackGame, object, object, HandState]:
-    game = StarBlackjackGame()
+) -> tuple[CasinoBlackjackGame, object, object, HandState]:
+    game = CasinoBlackjackGame()
     table = game.create_table(round_index=0)
     box = table.boxes[0]
     hand = box.hands[0]

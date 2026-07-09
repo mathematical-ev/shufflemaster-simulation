@@ -1,4 +1,4 @@
-"""Approximate published H17 multi-deck strategy constrained by Star rules."""
+"""Approximate published H17 multi-deck strategy constrained by house rules."""
 
 from typing import Final
 
@@ -61,10 +61,10 @@ PAIR_TOTALS: Final[dict[int | str, tuple[str, ...]]] = {
 }
 
 
-class PublishedApproxStarStrategy:
-    """Published H17 multi-deck basic strategy constrained by Star rules.
+class PublishedApproxCasinoStrategy:
+    """Published H17 multi-deck basic strategy constrained by house rules.
 
-    This is a starting baseline, not an exact solver-generated Star-optimal
+    This is a starting baseline, not an exact solver-generated house-rule-optimal
     strategy.
     """
 
@@ -77,7 +77,7 @@ class PublishedApproxStarStrategy:
         dealer_upcard: Card,
         legal_actions: frozenset[ActionType],
     ) -> GameAction:
-        """Choose the best table action that is legal under Star rules."""
+        """Choose the best table action that is legal under house rules."""
         _ = table
         dealer_key = self._dealer_key(dealer_upcard)
         strategy_code = self._strategy_code(hand, dealer_key, legal_actions)

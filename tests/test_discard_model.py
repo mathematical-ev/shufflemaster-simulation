@@ -4,9 +4,9 @@ from dataclasses import replace
 from shufflemaster_sim.actions import ActionType, GameAction
 from shufflemaster_sim.card_sources import CardSpec, FiniteShoeCardSource
 from shufflemaster_sim.cards import Card
-from shufflemaster_sim.games.star_blackjack import (
-    StarBlackjackConfig,
-    StarBlackjackGame,
+from shufflemaster_sim.games.casino_blackjack import (
+    CasinoBlackjackConfig,
+    CasinoBlackjackGame,
 )
 from shufflemaster_sim.state import BoxState, HandState, TableState
 
@@ -78,7 +78,7 @@ class TrackingCardSource:
 
 
 def play_round(
-    game: StarBlackjackGame,
+    game: CasinoBlackjackGame,
     source: TrackingCardSource,
     actions: list[ActionType],
     *,
@@ -96,7 +96,7 @@ def draw_ids(cards: Iterable[Card]) -> list[int]:
 
 
 def test_bust_hand_cards_are_discarded_immediately_and_not_again() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = TrackingCardSource(
         [("T", "spades"), ("6", "clubs"), ("6", "hearts"), ("T", "diamonds")]
     )
@@ -109,7 +109,7 @@ def test_bust_hand_cards_are_discarded_immediately_and_not_again() -> None:
 
 
 def test_live_player_hand_stays_on_layout_until_final_collection() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -143,7 +143,7 @@ def test_live_player_hand_stays_on_layout_until_final_collection() -> None:
 
 
 def test_split_bust_discards_only_busted_hand_until_final_collection() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = TrackingCardSource(
         [
             ("8", "spades"),
@@ -180,7 +180,7 @@ def test_split_bust_discards_only_busted_hand_until_final_collection() -> None:
 
 
 def test_previous_rack_returns_only_after_next_initial_deal() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -208,7 +208,7 @@ def test_previous_rack_returns_only_after_next_initial_deal() -> None:
 
 
 def test_previous_rack_is_not_returned_when_shuffling_device_disabled() -> None:
-    game = StarBlackjackGame(StarBlackjackConfig(use_shuffling_device=False))
+    game = CasinoBlackjackGame(CasinoBlackjackConfig(use_shuffling_device=False))
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -229,7 +229,7 @@ def test_previous_rack_is_not_returned_when_shuffling_device_disabled() -> None:
 
 
 def test_current_blackjack_discards_are_not_in_previous_rack_return() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -258,7 +258,7 @@ def test_current_blackjack_discards_are_not_in_previous_rack_return() -> None:
 
 
 def test_source_receives_discards_in_same_order_as_ordered_rack() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -283,7 +283,7 @@ def test_source_receives_discards_in_same_order_as_ordered_rack() -> None:
 
 
 def test_finite_shoe_receives_previous_rack_after_next_initial_deal() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = FiniteShoeCardSource(deck_count=1, seed=42)
     first_table = game.play_round(
         round_index=0,

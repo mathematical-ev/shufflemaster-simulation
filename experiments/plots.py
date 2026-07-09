@@ -193,5 +193,44 @@ def plot_cumulative_profit(
     return output_path
 
 
+def plot_physical_recurrence_histogram(
+    recurrence: Mapping[str, Any],
+    *,
+    probability: float,
+    title: str,
+    output_path: Path,
+) -> Path:
+    """Plot physical cards-between recurrence counts with geometric overlay."""
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    histogram = _int_key_mapping(recurrence.get("cards_between_histogram", {}))
+    support = sorted(histogram) if histogram else [0]
+    max_support = max(support)
+    observations = int(recurrence.get("return_observations", 0))
+    expected = geometric_probabilities(max_support, probability)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.bar(
+        support,
+        [histogram.get(value, 0) for value in support],
+        alpha=0.65,
+        label="Observed count",
+    )
+    ax.plot(
+        list(expected),
+        [expected[value] * observations for value in expected],
+        color="black",
+        linewidth=1.5,
+        label="IID geometric expected count",
+    )
+    ax.set_title(title)
+    ax.set_xlabel("Cards between appearances")
+    ax.set_ylabel("Return observations")
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(output_path)
+    plt.close(fig)
+    return output_path
+
+
 def _int_key_mapping(mapping: Mapping[Any, Any]) -> dict[int, Any]:
     return {int(key): value for key, value in mapping.items()}

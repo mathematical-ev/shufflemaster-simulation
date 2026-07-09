@@ -115,6 +115,68 @@ class IidRandomCardSource:
         return draw_id
 
 
+class PhysicalIidCardSource:
+    """IID source over a labelled finite physical-card population."""
+
+    def __init__(
+        self,
+        *,
+        deck_count: int = 6,
+        rng: Random | None = None,
+        seed: int | str | bytes | bytearray | None = None,
+        start_draw_id: int = 0,
+    ) -> None:
+        if deck_count <= 0:
+            raise ValueError("deck_count must be positive.")
+        if rng is not None and seed is not None:
+            raise ValueError("Pass either rng or seed, not both.")
+
+        self.deck_count = deck_count
+        self._rng = rng if rng is not None else Random(seed)
+        self._next_draw_id = start_draw_id
+        self._physical_cards = self._build_physical_cards(deck_count)
+
+    @property
+    def physical_cards(self) -> tuple[Card, ...]:
+        """Return the labelled physical-card population."""
+        return tuple(self._physical_cards)
+
+    @property
+    def physical_card_count(self) -> int:
+        """Return the number of labelled physical cards."""
+        return len(self._physical_cards)
+
+    def before_round(self) -> None:
+        """No-op round hook for physical IID draws."""
+
+    def draw_card(self) -> Card:
+        """Select one physical card independently and assign a fresh draw id."""
+        physical_card = self._rng.choice(self._physical_cards)
+        return replace(physical_card, draw_id=self._consume_draw_id())
+
+    def accept_discards(self, cards: Sequence[Card]) -> None:
+        """Accept discards as a no-op because physical IID has no depletion."""
+        _ = cards
+
+    def _consume_draw_id(self) -> int:
+        draw_id = self._next_draw_id
+        self._next_draw_id += 1
+        return draw_id
+
+    def _build_physical_cards(self, deck_count: int) -> list[Card]:
+        return [
+            Card(
+                rank=rank,
+                suit=suit,
+                physical_id=f"physical-iid-deck-{deck_index}:{rank}:{suit}",
+                draw_id=-1,
+            )
+            for deck_index in range(deck_count)
+            for suit in SUITS
+            for rank in RANKS
+        ]
+
+
 class FiniteShoeCardSource:
     """Finite shuffled shoe that draws physical cards without replacement."""
 

@@ -1,6 +1,10 @@
 import pytest
 
-from shufflemaster_sim.card_sources import IidRandomCardSource, ScriptedCardSource
+from shufflemaster_sim.card_sources import (
+    IidRandomCardSource,
+    PhysicalIidCardSource,
+    ScriptedCardSource,
+)
 from shufflemaster_sim.cards import Card
 
 
@@ -81,3 +85,37 @@ def test_iid_random_card_source_assigns_new_physical_identity_per_draw() -> None
     physical_ids = [source.draw_card().physical_id for _ in range(100)]
 
     assert len(set(physical_ids)) == len(physical_ids)
+
+
+def test_physical_iid_source_has_labelled_physical_population() -> None:
+    source = PhysicalIidCardSource(deck_count=6, seed=42)
+
+    assert source.physical_card_count == 312
+    assert len(source.physical_cards) == 312
+    assert len({card.physical_id for card in source.physical_cards}) == 312
+
+
+def test_physical_iid_source_reproducible_with_same_seed() -> None:
+    first = PhysicalIidCardSource(deck_count=6, seed=42)
+    second = PhysicalIidCardSource(deck_count=6, seed=42)
+
+    assert [first.draw_card().physical_id for _ in range(25)] == [
+        second.draw_card().physical_id for _ in range(25)
+    ]
+
+
+def test_physical_iid_source_different_seed_may_differ() -> None:
+    first = PhysicalIidCardSource(deck_count=6, seed=1)
+    second = PhysicalIidCardSource(deck_count=6, seed=2)
+
+    assert [first.draw_card().physical_id for _ in range(25)] != [
+        second.draw_card().physical_id for _ in range(25)
+    ]
+
+
+def test_physical_iid_source_assigns_new_draw_id_each_draw() -> None:
+    source = PhysicalIidCardSource(deck_count=6, seed=42)
+
+    cards = [source.draw_card() for _ in range(50)]
+
+    assert [card.draw_id for card in cards] == list(range(50))

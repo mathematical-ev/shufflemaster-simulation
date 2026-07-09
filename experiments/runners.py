@@ -21,12 +21,12 @@ from experiments.plots import (
 )
 from shufflemaster_sim.card_sources import IidRandomCardSource
 from shufflemaster_sim.cards import Card
-from shufflemaster_sim.simulation import SimulationConfig, run_star_blackjack_baseline
+from shufflemaster_sim.simulation import SimulationConfig, run_casino_blackjack_baseline
 
 
 @dataclass(frozen=True, slots=True)
 class IidBaselineExperimentConfig:
-    """Configuration for IID source and Star Blackjack baseline experiments."""
+    """Configuration for IID source and Casino Blackjack baseline experiments."""
 
     source_draws: int = 1_000_000
     game_rounds: int = 1_000_000
@@ -65,8 +65,8 @@ def run_iid_source_experiment(config: IidBaselineExperimentConfig) -> dict[str, 
 
 
 def run_iid_game_experiment(config: IidBaselineExperimentConfig) -> dict[str, Any]:
-    """Run Star Blackjack with IID cards and return aggregate metrics."""
-    result = run_star_blackjack_baseline(
+    """Run Casino Blackjack with IID cards and return aggregate metrics."""
+    result = run_casino_blackjack_baseline(
         SimulationConfig(
             rounds=config.game_rounds,
             base_bet=config.base_bet,

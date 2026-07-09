@@ -12,13 +12,13 @@ from shufflemaster_sim.card_sources import (
     One2SixCardSource,
     One2SixConfig,
 )
-from shufflemaster_sim.games.star_blackjack import (
-    StarBlackjackConfig,
-    StarBlackjackGame,
+from shufflemaster_sim.games.casino_blackjack import (
+    CasinoBlackjackConfig,
+    CasinoBlackjackGame,
 )
 from shufflemaster_sim.results import ResultRecorder, SimulationResult
-from shufflemaster_sim.strategies.published_star_strategy import (
-    PublishedApproxStarStrategy,
+from shufflemaster_sim.strategies.published_casino_strategy import (
+    PublishedApproxCasinoStrategy,
 )
 
 CardSourceKind = Literal["iid", "finite-shoe", "manual-shoe", "one2six"]
@@ -26,7 +26,7 @@ CardSourceKind = Literal["iid", "finite-shoe", "manual-shoe", "one2six"]
 
 @dataclass(frozen=True, slots=True)
 class SimulationConfig:
-    """Configuration for the Star Blackjack baseline simulation."""
+    """Configuration for the Casino Blackjack baseline simulation."""
 
     rounds: int = 10_000
     base_bet: float = 10.0
@@ -78,8 +78,8 @@ class SimulationConfig:
         return box_bets
 
 
-def run_star_blackjack_baseline(config: SimulationConfig) -> SimulationResult:
-    """Run the one-box Star Blackjack baseline simulation."""
+def run_casino_blackjack_baseline(config: SimulationConfig) -> SimulationResult:
+    """Run the one-box Casino Blackjack baseline simulation."""
     card_source: CardSource
     if config.card_source == "iid":
         card_source = IidRandomCardSource(seed=config.seed)
@@ -109,15 +109,15 @@ def run_star_blackjack_baseline(config: SimulationConfig) -> SimulationResult:
         )
 
     box_bets = config.resolved_box_bets()
-    game = StarBlackjackGame(
-        StarBlackjackConfig(
+    game = CasinoBlackjackGame(
+        CasinoBlackjackConfig(
             base_bet=box_bets[1],
             box_count=len(box_bets),
             box_bets=box_bets,
             deck_count=config.effective_deck_count,
         )
     )
-    strategy = PublishedApproxStarStrategy()
+    strategy = PublishedApproxCasinoStrategy()
     recorder = ResultRecorder(base_bet=box_bets[1], box_count=len(box_bets))
 
     for round_index in range(config.rounds):

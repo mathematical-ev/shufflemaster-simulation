@@ -8,7 +8,7 @@ from shufflemaster_sim.card_sources import (
     One2SixConfig,
 )
 from shufflemaster_sim.cards import Card
-from shufflemaster_sim.simulation import SimulationConfig, run_star_blackjack_baseline
+from shufflemaster_sim.simulation import SimulationConfig, run_casino_blackjack_baseline
 
 
 def test_default_one2six_config_and_initial_load() -> None:
@@ -191,7 +191,7 @@ def test_different_seed_may_change_initial_draw_sequence() -> None:
 
 
 def test_star_baseline_runs_with_one2six_source() -> None:
-    result = run_star_blackjack_baseline(
+    result = run_casino_blackjack_baseline(
         SimulationConfig(rounds=25, seed=42, card_source="one2six")
     )
 

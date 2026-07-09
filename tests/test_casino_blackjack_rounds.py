@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from shufflemaster_sim.actions import ActionType, GameAction
 from shufflemaster_sim.card_sources import ScriptedCardSource
 from shufflemaster_sim.cards import Card, Rank
-from shufflemaster_sim.games.star_blackjack import StarBlackjackGame
+from shufflemaster_sim.games.casino_blackjack import CasinoBlackjackGame
 from shufflemaster_sim.hand_values import hand_value, is_natural_blackjack
 from shufflemaster_sim.state import BoxState, HandState, TableState
 
@@ -29,7 +29,7 @@ class QueueStrategy:
 
 def play_round(cards: list[tuple[Rank, str]], actions: list[ActionType]) -> TableState:
     source = ScriptedCardSource(cards)
-    return StarBlackjackGame().play_round(
+    return CasinoBlackjackGame().play_round(
         round_index=0,
         card_source=source,
         strategy=QueueStrategy(actions),
@@ -156,7 +156,7 @@ def test_double_loss_loses_double_wager() -> None:
 
 
 def test_double_bust_loses_double_wager() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     table = game.create_table(round_index=0)
     hand = table.boxes[0].hands[0]
     hand.cards = [
@@ -190,7 +190,7 @@ def test_dealer_blackjack_after_double_loses_original_only() -> None:
 
 
 def test_split_creates_two_hands() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = ScriptedCardSource(
         [
             ("8", "spades"),
@@ -217,7 +217,7 @@ def test_split_creates_two_hands() -> None:
 
 
 def test_split_aces_receive_one_card_each_and_stop() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = ScriptedCardSource(
         [
             ("A", "spades"),
@@ -245,7 +245,7 @@ def test_split_aces_receive_one_card_each_and_stop() -> None:
 
 
 def test_split_ace_ten_is_twenty_one_but_not_blackjack() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = ScriptedCardSource(
         [
             ("A", "spades"),
@@ -275,7 +275,7 @@ def test_split_ace_ten_is_twenty_one_but_not_blackjack() -> None:
 
 
 def test_split_ten_ace_is_twenty_one_but_not_blackjack() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     source = ScriptedCardSource(
         [
             ("T", "spades"),

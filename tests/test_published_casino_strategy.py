@@ -2,10 +2,10 @@ import pytest
 
 from shufflemaster_sim.actions import ActionType
 from shufflemaster_sim.cards import Card, Rank
-from shufflemaster_sim.games.star_blackjack import StarBlackjackGame
+from shufflemaster_sim.games.casino_blackjack import CasinoBlackjackGame
 from shufflemaster_sim.state import HandState
-from shufflemaster_sim.strategies.published_star_strategy import (
-    PublishedApproxStarStrategy,
+from shufflemaster_sim.strategies.published_casino_strategy import (
+    PublishedApproxCasinoStrategy,
 )
 
 
@@ -19,7 +19,7 @@ def card(rank: Rank, draw_id: int = 0) -> Card:
 
 
 def choose_action(player_cards: list[Rank], dealer_rank: Rank) -> ActionType:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     table = game.create_table(round_index=0)
     box = table.boxes[0]
     hand = box.hands[0]
@@ -29,7 +29,7 @@ def choose_action(player_cards: list[Rank], dealer_rank: Rank) -> ActionType:
     legal_actions = game.legal_actions(table=table, box=box, hand=hand)
 
     return (
-        PublishedApproxStarStrategy()
+        PublishedApproxCasinoStrategy()
         .choose_action(
             table=table,
             box=box,
@@ -94,7 +94,7 @@ def test_strategy_never_chooses_illegal_action(
     player_cards: list[Rank],
     dealer_rank: Rank,
 ) -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     table = game.create_table(round_index=0)
     box = table.boxes[0]
     hand: HandState = box.hands[0]
@@ -103,7 +103,7 @@ def test_strategy_never_chooses_illegal_action(
     table.dealer.cards = [dealer_upcard]
     legal_actions = game.legal_actions(table=table, box=box, hand=hand)
 
-    action = PublishedApproxStarStrategy().choose_action(
+    action = PublishedApproxCasinoStrategy().choose_action(
         table=table,
         box=box,
         hand=hand,
@@ -115,7 +115,7 @@ def test_strategy_never_chooses_illegal_action(
 
 
 def test_strategy_declines_insurance_and_even_money() -> None:
-    strategy = PublishedApproxStarStrategy()
+    strategy = PublishedApproxCasinoStrategy()
 
     assert not strategy.wants_insurance()
     assert not strategy.wants_even_money()
@@ -126,7 +126,7 @@ def test_strategy_uses_double_fallback_when_star_double_is_illegal() -> None:
 
 
 def test_strategy_uses_pair_fallback_when_resplit_is_illegal() -> None:
-    game = StarBlackjackGame()
+    game = CasinoBlackjackGame()
     table = game.create_table(round_index=0)
     box = table.boxes[0]
     hand = box.hands[0]
@@ -136,7 +136,7 @@ def test_strategy_uses_pair_fallback_when_resplit_is_illegal() -> None:
     table.dealer.cards = [dealer_upcard]
     legal_actions = game.legal_actions(table=table, box=box, hand=hand)
 
-    action = PublishedApproxStarStrategy().choose_action(
+    action = PublishedApproxCasinoStrategy().choose_action(
         table=table,
         box=box,
         hand=hand,

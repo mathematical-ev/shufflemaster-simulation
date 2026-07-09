@@ -21,7 +21,7 @@ specified and tests exist.
 - Do not use uncontrolled randomness in game logic.
 - Inject `random.Random` instances or seeds anywhere randomness is required.
 - Prefer small pure functions and typed dataclasses.
-- Star rules must be implemented from explicit source material, not memory.
+- House rules must be implemented from explicit source material, not memory.
 - The published strategy is an approximate baseline only.
 - The current runnable card sources are IID random, generic finite shoe,
   manual shoe, and a configurable One2Six-style source model.
@@ -50,6 +50,29 @@ specified and tests exist.
 - Poisson approximations are suitable for fixed-window counts, not
   inter-arrival time.
 - Always validate the IID baseline before interpreting One2Six output.
+- Physical IID is a mathematical null model, not a manual shoe and not
+  One2Six.
+- Physical recurrence experiments for six-deck comparisons should use 312
+  labelled physical cards.
+- Do not confuse symbol/rank IID recurrence with labelled physical-card IID
+  recurrence.
+- Physical IID recurrence outputs must include config metadata for
+  reproducibility.
+- Do not report formal statistical significance unless a proper test and its
+  assumptions are implemented.
+- Diagnostic residuals are not exploitability evidence by themselves.
+- Run and inspect the physical IID recurrence baseline before interpreting
+  One2Six recurrence output.
+- One2Six recurrence outputs must include source diagnostics such as ejection
+  counts, fallback rates, group sizes, occupancy, and available latency
+  summaries.
+- Do not interpret recurrence deviations as exploitability without game-level
+  and strategy-level evidence.
+- Before treating One2Six recurrence patterns as robust, run sensitivity over
+  recycle batch size.
+- Do not treat one recycle batch size as robust evidence.
+- Keep source-level recurrence structure separate from game-level
+  exploitability analysis.
 
 ## Important Directories
 
@@ -85,10 +108,10 @@ python -m mypy src
 - Do not add heavy dependencies without justification.
 - Do not extend One2Six / Shuffle Master logic beyond explicitly requested and
   tested source-model assumptions.
-- Do not implement Star Blackjack, Pontoon, or other casino rules from memory.
+- Do not implement Casino Blackjack, Pontoon, or other casino rules from memory.
   Leave placeholders until rules are explicitly specified.
 - Do not make claims about exploitability without simulation evidence.
 - Do not treat one run's profit as evidence of exploitability.
-- Future work should include a solver-generated exact Star strategy.
+- Future work should include a solver-generated exact house-rule strategy.
 - Future work should validate and calibrate One2Six source assumptions before
   making any exploitability claims.

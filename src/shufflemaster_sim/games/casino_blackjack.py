@@ -1,4 +1,4 @@
-"""Star Blackjack rules and one-round engine."""
+"""Casino Blackjack rules and one-round engine."""
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -17,8 +17,8 @@ from shufflemaster_sim.hand_values import (
 from shufflemaster_sim.state import BoxState, DealerState, HandState, TableState
 
 
-class StarBlackjackStrategy(Protocol):
-    """Protocol for strategies that choose from legal Star actions."""
+class CasinoBlackjackStrategy(Protocol):
+    """Protocol for strategies that choose from legal house-rule actions."""
 
     def choose_action(
         self,
@@ -33,8 +33,8 @@ class StarBlackjackStrategy(Protocol):
 
 
 @dataclass(frozen=True, slots=True)
-class StarBlackjackConfig:
-    """Configuration for Star Blackjack metadata and table rules."""
+class CasinoBlackjackConfig:
+    """Configuration for Casino Blackjack metadata and table rules."""
 
     base_bet: float = 10.0
     box_count: int = 1
@@ -71,11 +71,11 @@ class StarBlackjackConfig:
         return box_bets
 
 
-class StarBlackjackGame:
-    """Rules engine for one round at a Star Blackjack table."""
+class CasinoBlackjackGame:
+    """Rules engine for one round at a Casino Blackjack table."""
 
-    def __init__(self, config: StarBlackjackConfig | None = None) -> None:
-        self.config = config if config is not None else StarBlackjackConfig()
+    def __init__(self, config: CasinoBlackjackConfig | None = None) -> None:
+        self.config = config if config is not None else CasinoBlackjackConfig()
         self._pending_discard_rack: list[Card] = []
 
     def play_round(
@@ -83,7 +83,7 @@ class StarBlackjackGame:
         *,
         round_index: int,
         card_source: CardSource,
-        strategy: StarBlackjackStrategy,
+        strategy: CasinoBlackjackStrategy,
     ) -> TableState:
         """Play and settle one full round."""
         card_source.before_round()
@@ -170,7 +170,7 @@ class StarBlackjackGame:
         box: BoxState,
         hand: HandState,
     ) -> frozenset[ActionType]:
-        """Return legal actions for a hand under Star Blackjack constraints."""
+        """Return legal actions for a hand under Casino Blackjack constraints."""
         _ = table
         if hand.outcome_label is not None or hand.is_from_split_aces:
             return frozenset()
@@ -198,7 +198,7 @@ class StarBlackjackGame:
         self,
         table: TableState,
         card_source: CardSource,
-        strategy: StarBlackjackStrategy,
+        strategy: CasinoBlackjackStrategy,
     ) -> None:
         """Play all boxes and hands left-to-right."""
         dealer_upcard = table.dealer.cards[0]

@@ -66,5 +66,5 @@ def double_eligibility_total(cards: list[Card]) -> int:
 
 
 def is_double_eligible_total(cards: list[Card]) -> bool:
-    """Return whether the first two cards satisfy Star double totals."""
+    """Return whether the first two cards satisfy house double totals."""
     return len(cards) == 2 and double_eligibility_total(cards) in {9, 10, 11}

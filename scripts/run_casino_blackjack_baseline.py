@@ -1,10 +1,10 @@
-"""Run the Star Blackjack baseline simulation."""
+"""Run the Casino Blackjack baseline simulation."""
 
 from argparse import ArgumentParser
 
 from shufflemaster_sim.simulation import (
     SimulationConfig,
-    run_star_blackjack_baseline,
+    run_casino_blackjack_baseline,
 )
 
 
@@ -61,7 +61,7 @@ def parse_args() -> SimulationConfig:
 def main() -> None:
     """Run the baseline and print a compact summary."""
     config = parse_args()
-    result = run_star_blackjack_baseline(config)
+    result = run_casino_blackjack_baseline(config)
     box = result.box_results[0]
     player_edge_initial = result.edge_per_initial_wager
     player_edge_total = result.edge_per_total_wager
