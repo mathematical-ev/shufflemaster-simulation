@@ -1,11 +1,21 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 """Mutable round state for blackjack-like table games."""
 
 from dataclasses import dataclass, field
 
-from shufflemaster_sim.cards import Card
+from shufflemaster_sim.actions import ActionType
+from shufflemaster_sim.cards import Card, Rank
+
+
+@dataclass(frozen=True, slots=True)
+class BlackjackDecisionState:
+    """Source-blind information available to a blackjack strategy."""
+
+    player_ranks: tuple[Rank, ...]
+    dealer_upcard_rank: Rank
+    legal_actions: frozenset[ActionType]
+    is_split_hand: bool
 
 
 @dataclass(slots=True)

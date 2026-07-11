@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 """Sensitivity experiment for One2Six recurrence recycle batch size."""
 

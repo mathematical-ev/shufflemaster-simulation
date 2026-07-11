@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 """Casino Blackjack rules and one-round engine."""
 
@@ -17,7 +16,13 @@ from shufflemaster_sim.hand_values import (
     is_natural_blackjack,
     split_value,
 )
-from shufflemaster_sim.state import BoxState, DealerState, HandState, TableState
+from shufflemaster_sim.state import (
+    BlackjackDecisionState,
+    BoxState,
+    DealerState,
+    HandState,
+    TableState,
+)
 
 
 class CasinoBlackjackStrategy(Protocol):
@@ -26,11 +31,7 @@ class CasinoBlackjackStrategy(Protocol):
     def choose_action(
         self,
         *,
-        table: TableState,
-        box: BoxState,
-        hand: HandState,
-        dealer_upcard: Card,
-        legal_actions: frozenset[ActionType],
+        decision: BlackjackDecisionState,
     ) -> GameAction:
         """Choose the next action."""
 
@@ -44,10 +45,11 @@ class CasinoBlackjackConfig:
     box_bets: Mapping[int, float] | None = None
     deck_count: int = 6
     blackjack_payout: float = 1.5
-    dealer_hits_soft_17: bool = True
+    dealer_hits_soft_17: bool = False
     allow_resplit: bool = False
     max_hands_per_box: int = 2
     use_shuffling_device: bool = True
+    burn_initial_card: bool = True
 
     def __post_init__(self) -> None:
         if not 1 <= self.box_count <= 7:
@@ -80,6 +82,12 @@ class CasinoBlackjackGame:
     def __init__(self, config: CasinoBlackjackConfig | None = None) -> None:
         self.config = config if config is not None else CasinoBlackjackConfig()
         self._pending_discard_rack: list[Card] = []
+        self._initial_burn_completed = False
+
+    @property
+    def pending_discard_rack(self) -> tuple[Card, ...]:
+        """Return cards awaiting the next post-initial-deal source return."""
+        return tuple(self._pending_discard_rack)
 
     def play_round(
         self,
@@ -90,6 +98,7 @@ class CasinoBlackjackGame:
     ) -> TableState:
         """Play and settle one full round."""
         card_source.before_round()
+        self.burn_initial_card(card_source)
         table = self.create_table(round_index)
         self.deal_initial_cards(table, card_source)
         self.settle_immediate_blackjacks(table)
@@ -99,6 +108,13 @@ class CasinoBlackjackGame:
         self.collect_remaining_layout_cards(table)
         self.stage_discard_rack_for_next_round(table)
         return table
+
+    def burn_initial_card(self, card_source: CardSource) -> None:
+        """Burn the first source card once at the start of a game session."""
+        if not self.config.burn_initial_card or self._initial_burn_completed:
+            return
+        self._pending_discard_rack.append(card_source.draw_card())
+        self._initial_burn_completed = True
 
     def create_table(self, round_index: int) -> TableState:
         """Create empty round state with configured boxes."""
@@ -220,11 +236,12 @@ class CasinoBlackjackGame:
                         break
 
                     action = strategy.choose_action(
-                        table=table,
-                        box=box,
-                        hand=hand,
-                        dealer_upcard=dealer_upcard,
-                        legal_actions=legal_actions,
+                        decision=BlackjackDecisionState(
+                            player_ranks=tuple(card.rank for card in hand.cards),
+                            dealer_upcard_rank=dealer_upcard.rank,
+                            legal_actions=legal_actions,
+                            is_split_hand=hand.is_split_hand,
+                        )
                     )
                     self.apply_action(
                         table=table,
@@ -366,7 +383,7 @@ class CasinoBlackjackGame:
             table.discard_rack.extend(table.dealer.cards)
             table.dealer.is_collected = True
 
-        self._validate_no_duplicate_discards(table.discard_rack)
+        self._validate_no_duplicate_discard_events(table.discard_rack)
 
     def stage_discard_rack_for_next_round(self, table: TableState) -> None:
         """Make this round's ordered rack the next pending shuffling-device return."""
@@ -540,7 +557,10 @@ class CasinoBlackjackGame:
     def _next_hand_id(self, box: BoxState) -> int:
         return max(hand.hand_id for hand in box.hands) + 1
 
-    def _validate_no_duplicate_discards(self, discard_rack: Sequence[Card]) -> None:
-        physical_ids = [card.physical_id for card in discard_rack]
-        if len(physical_ids) != len(set(physical_ids)):
-            raise RuntimeError("Discard rack contains duplicate physical card ids.")
+    def _validate_no_duplicate_discard_events(
+        self,
+        discard_rack: Sequence[Card],
+    ) -> None:
+        draw_ids = [card.draw_id for card in discard_rack]
+        if len(draw_ids) != len(set(draw_ids)):
+            raise RuntimeError("Discard rack contains duplicate draw events.")

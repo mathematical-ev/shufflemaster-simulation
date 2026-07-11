@@ -1,11 +1,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 """Pure hand-value helpers for blackjack-like games."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 
-from shufflemaster_sim.cards import Card, blackjack_value
+from shufflemaster_sim.cards import Card, Rank, blackjack_value
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,8 +23,13 @@ def card_blackjack_value(card: Card) -> int:
 
 def hand_value(cards: list[Card]) -> HandValue:
     """Return the best blackjack total for a hand."""
-    total = sum(card_blackjack_value(card) for card in cards)
-    aces_counted_as_eleven = sum(1 for card in cards if card.rank == "A")
+    return hand_value_from_ranks([card.rank for card in cards])
+
+
+def hand_value_from_ranks(ranks: Sequence[Rank]) -> HandValue:
+    """Return the best blackjack total without exposing card identities."""
+    total = sum(blackjack_value(rank) for rank in ranks)
+    aces_counted_as_eleven = sum(1 for rank in ranks if rank == "A")
 
     while total > 21 and aces_counted_as_eleven > 0:
         total -= 10
@@ -52,7 +57,12 @@ def is_natural_blackjack(cards: list[Card], *, blackjack_eligible: bool = True) 
 
 def split_value(card: Card) -> int | str:
     """Return the value used for pair splitting."""
-    value = card_blackjack_value(card)
+    return split_value_from_rank(card.rank)
+
+
+def split_value_from_rank(rank: Rank) -> int | str:
+    """Return the pair-splitting value without exposing card identity."""
+    value = blackjack_value(rank)
     if value == 11:
         return "A"
     if value == 10:

@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 import pytest
 
@@ -42,13 +41,12 @@ def legal_for(
     return game.legal_actions(table=table, box=box, hand=hand)
 
 
-def test_dealer_hits_soft_seventeen() -> None:
+def test_dealer_stands_on_soft_seventeen() -> None:
     game, table, _, _ = make_dealt_table(["T", "7"], ["A", "6"])
-    source = ScriptedCardSource([("T", "hearts")])
 
-    game.play_dealer(table, source)
+    game.play_dealer(table, ScriptedCardSource([]))
 
-    assert [drawn.rank for drawn in table.dealer.cards] == ["A", "6", "T"]
+    assert [drawn.rank for drawn in table.dealer.cards] == ["A", "6"]
 
 
 def test_dealer_stands_on_hard_seventeen() -> None:
@@ -65,6 +63,35 @@ def test_dealer_stands_on_soft_eighteen() -> None:
     game.play_dealer(table, ScriptedCardSource([]))
 
     assert [drawn.rank for drawn in table.dealer.cards] == ["A", "7"]
+
+
+def test_dealer_hits_hard_sixteen() -> None:
+    game, table, _, _ = make_dealt_table(["T", "7"], ["T", "6"])
+    source = ScriptedCardSource([("A", "hearts")])
+
+    game.play_dealer(table, source)
+
+    assert [drawn.rank for drawn in table.dealer.cards] == ["T", "6", "A"]
+
+
+def test_dealer_hits_soft_sixteen() -> None:
+    game, table, _, _ = make_dealt_table(["T", "7"], ["A", "5"])
+    source = ScriptedCardSource([("A", "hearts")])
+
+    game.play_dealer(table, source)
+
+    assert [drawn.rank for drawn in table.dealer.cards] == ["A", "5", "A"]
+
+
+def test_one_box_initial_deal_order() -> None:
+    game = CasinoBlackjackGame()
+    table = game.create_table(round_index=0)
+    source = ScriptedCardSource([("2", "spades"), ("3", "clubs"), ("4", "hearts")])
+
+    game.deal_initial_cards(table, source)
+
+    assert [card.rank for card in table.boxes[0].hands[0].cards] == ["2", "4"]
+    assert [card.rank for card in table.dealer.cards] == ["3"]
 
 
 def test_dealer_stops_after_bust() -> None:

@@ -101,9 +101,13 @@ The baseline uses a configurable base bet and defaults to `IidRandomCardSource`.
 It is structured so the card source can be replaced by a finite shoe, manual
 shoe, or One2Six-style source without changing the Casino Blackjack game rules.
 
-`PublishedApproxCasinoStrategy` is a starting published H17 multi-deck basic
+`PublishedApproxCasinoStrategy` is a starting published S17 multi-deck basic
 strategy constrained by Casino Blackjack legal actions. It is not yet a
 solver-generated exact Casino Blackjack strategy.
+
+The current casino rule profile stands on every hard or soft 17. It also burns
+one card at the start of a game session and returns that burn through the same
+post-initial-deal discard path used for later rounds.
 
 The engine explicitly models ordered discard-rack collection and
 shuffling-device return timing. Current-round discards are staged for return
@@ -201,6 +205,74 @@ for streak continuation: `W, W, P, W` is a win streak of 3, and `L, L, P, L` is
 a loss streak of 3. Signed streak plots put losses on the negative x-axis and
 wins on the positive x-axis.
 
+## Single-Box Game Validation
+
+The single-box game validation compares six-deck `PhysicalIidCardSource` and
+`One2SixCardSource` runs using identical casino blackjack rules, one shared
+fixed strategy implementation, and a flat base wager. Only the card source
+changes. Its primary metrics are net result, original player blackjacks, actual
+double actions, and actual split actions.
+
+Split actions are decomposed into original equal-value pair opportunities,
+pair value, dealer upcard, and the fixed strategy's chosen action. Ten, jack,
+queen, and king share one ten-value pair category. Under physical IID, the
+theoretical original pair-opportunity probability is `25 / 169`, or about
+14.7929%.
+
+Round-profit variance and a naive round-level normal interval are recorded
+without retaining every round. Those intervals are descriptive because
+One2Six rounds may be serially dependent. Independent seed runs, summarized
+with Student-t intervals and paired source differences, are the primary
+uncertainty unit for monetary and event-rate comparisons.
+
+Monetary streaks classify each completed round from the total result of the
+active box after combining all original, split, doubled, blackjack, and other
+settled hand results. A positive box result is a win, a negative result is a
+loss, and zero is a push. Pushes do not count toward a streak and do not break
+an open streak. Every independent seed finalizes its open streak so streaks
+never continue across seed boundaries.
+
+The signed streak histogram places loss streaks on the negative axis and win
+streaks on the positive axis. Its display groups lengths beyond 20 into
+explicit overflow bins, while JSON and CSV output retain every observed streak
+length.
+
+Run a smoke comparison:
+
+```bash
+python scripts/run_single_box_game_validation.py \
+  --rounds 10000 \
+  --base-bet 10 \
+  --seeds 42,43 \
+  --output-dir experiments/outputs/single_box_game_validation_split_smoke
+```
+
+Run the 20-seed replication:
+
+```bash
+python scripts/run_single_box_game_validation.py \
+  --rounds 500000 \
+  --base-bet 10 \
+  --seeds 42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61 \
+  --output-dir experiments/outputs/single_box_game_validation_20x500k
+```
+
+Run the five-seed monetary-streak validation:
+
+```bash
+python scripts/run_single_box_game_validation.py \
+  --rounds 200000 \
+  --base-bet 10 \
+  --seeds 42,43,44,45,46 \
+  --output-dir experiments/outputs/single_box_game_validation_5x200k
+```
+
+Each run writes per-seed details plus `summary.json`, `summary.csv`, and
+`summary.md`, along with compact per-seed, pair decomposition, and monetary
+streak CSV files plus a signed streak histogram.
+This is a game-engine and source-integration validation, not an
+advantage-strategy experiment.
+
 ## Six-Deck Physical IID Recurrence
 
 `PhysicalIidCardSource` is a mathematical null model over labelled physical
@@ -291,10 +363,335 @@ python scripts/run_one2six_recurrence_sensitivity.py \
   --output-dir experiments/outputs/one2six_recurrence_sensitivity_1m_seed42
 ```
 
+## Multi-Box Counterfactual Action Values
+
+The multi-box counterfactual experiment estimates the value of the next round
+from a player-observable betting-boundary state. The current state is only the
+composition of the visible discard rack after the preceding round has settled
+and before that rack is returned during the next initial deal.
+
+Each sampled state is cloned into branches that play one through seven boxes.
+All branches begin with identical source, RNG, buffer, carousel, feeder, game,
+and pending-rack state, then diverge naturally as different box counts consume
+different cards. Hidden state is used only to create identical counterfactual
+starting points. It is never exported as a predictor or exposed to the fixed
+player strategy.
+
+`PhysicalIidCardSource` is the negative control: visible rack composition
+should not predict its next deal. The first research goal is to determine
+whether any observable conditional signal appears under One2Six while staying
+absent under Physical IID. This experiment does not select, optimize, or
+validate a box-count strategy.
+
+Run the smoke experiment:
+
+```bash
+python scripts/run_multi_box_counterfactual_experiment.py \
+  --states-per-seed 100 \
+  --seeds 42,43 \
+  --burn-in-rounds 100 \
+  --sample-interval-rounds 2 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/multi_box_counterfactual_smoke
+```
+
+Run the five-seed exploratory experiment:
+
+```bash
+python scripts/run_multi_box_counterfactual_experiment.py \
+  --states-per-seed 2000 \
+  --seeds 42,43,44,45,46 \
+  --burn-in-rounds 1000 \
+  --sample-interval-rounds 5 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/multi_box_counterfactual_5x2000
+```
+
+The compact action file contains visible rack features and branch outcomes
+only. Physical IDs, source internals, RNG state, buffers, shelves, feeder
+contents, and card sequences are deliberately excluded. Independent seeds are
+the primary uncertainty unit.
+
+## Observable Card-Composition Response
+
+The observable card-response experiment measures composition directly before
+using noisy blackjack profit as an endpoint. It separates two mechanisms:
+
+1. **Immediate current-rack exclusion:** at a betting boundary, the visible
+   rack remains outside the source while a cloned source emits the next 15
+   cards. Fifteen positions cover the complete initial deal for seven boxes.
+2. **Delayed returned-batch response:** after each observable discard batch is
+   accepted, prefix sums measure future composition at exact lags 1 through 15
+   and over bands extending to 1,000 dealt cards.
+
+Low cards, neutral cards, ten-value cards, and aces remain separate. Aces are
+not combined with ten-value cards because their later blackjack value depends
+on whether they appear in player or dealer positions. Hi-Lo remains an
+additional aggregate diagnostic.
+
+Response slopes compare observed future composition with the simple
+finite-removal benchmark implied by the visible batch. A slope near zero means
+little observable finite-removal response, a slope near one resembles direct
+perfectly mixed exclusion, and a negative slope indicates reversal or a
+re-entry wave. These are predictive diagnostics, not isolated-batch causal
+effects.
+
+Physical IID is the negative control and should show no persistent response.
+Previous unconditional monetary streak results were materially similar across
+sources, so monetary streaks are not predictor features here. This experiment
+is a precursor to evaluating a time-decaying machine-adjusted count, not a
+completed count or betting strategy.
+
+Run the smoke experiment:
+
+```bash
+python scripts/run_observable_card_response_experiment.py \
+  --seeds 42,43 \
+  --current-rack-states-per-seed 100 \
+  --current-rack-burn-in-rounds 100 \
+  --current-rack-sample-interval-rounds 2 \
+  --current-rack-probe-cards 15 \
+  --lag-rounds-per-seed 2000 \
+  --lag-burn-in-rounds 100 \
+  --lag-horizon-cards 1000 \
+  --output-dir experiments/outputs/observable_card_response_smoke
+```
+
+Run the five-seed experiment:
+
+```bash
+python scripts/run_observable_card_response_experiment.py \
+  --seeds 42,43,44,45,46 \
+  --current-rack-states-per-seed 3000 \
+  --current-rack-burn-in-rounds 1000 \
+  --current-rack-sample-interval-rounds 5 \
+  --current-rack-probe-cards 15 \
+  --lag-rounds-per-seed 50000 \
+  --lag-burn-in-rounds 1000 \
+  --lag-horizon-cards 1000 \
+  --output-dir experiments/outputs/observable_card_response_5seed
+```
+
+## Held-Out Fading-Exclusion Validation
+
+The held-out experiment combines every active player-observable exclusion
+cohort into one frozen score. Its kernel was developed on seeds 42-46 and is
+validated without retuning on independent seeds 47-51:
+
+- current visible rack: `1.00`;
+- returned 1-15 dealt cards ago: `0.75`;
+- returned 16-50 dealt cards ago: `0.40`;
+- returned 51-100 dealt cards ago: `0.20`;
+- older returned batches: `0.00`.
+
+Each returned batch contributes to exactly one dealt-card age band. The score
+is calculated before the wager and before the next initial deal, while the
+current rack is still outside the source. Full current-rack exclusion therefore
+applies to the initial deal; it is not assumed to apply unchanged to later hit
+and dealer cards in the same round.
+
+The primary endpoint is the next 15 cards' composition. Initial player and
+dealer positions are also analysed, with aces kept separate from ten-value
+cards. Flat-bet full-round profit is secondary and exploratory. Monetary
+streaks are not predictors, Physical IID is the negative control, and this
+phase validates a candidate signal rather than selecting a strategy.
+
+Run a smoke validation:
+
+```bash
+python scripts/run_fading_exclusion_validation.py \
+  --seeds 47,48 \
+  --rounds-per-seed 2000 \
+  --burn-in-rounds 100 \
+  --probe-states-per-seed 100 \
+  --probe-cards 15 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/fading_exclusion_validation_smoke
+```
+
+Run the full held-out validation:
+
+```bash
+python scripts/run_fading_exclusion_validation.py \
+  --seeds 47,48,49,50,51 \
+  --rounds-per-seed 50000 \
+  --burn-in-rounds 1000 \
+  --probe-states-per-seed 3000 \
+  --probe-cards 15 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/fading_exclusion_validation_heldout
+```
+
+## Held-Out Conditional Profitability
+
+This phase changes the primary endpoint from card composition to next-round
+player profit under the unchanged source-blind fixed strategy. The development
+stage uses One2Six scores from seeds 42-51 only to freeze the 10th, 30th, 70th,
+and 90th percentile score-band cutpoints. It does not inspect monetary results,
+game events, dealer outcomes, or validation seeds while defining those bands.
+
+The same numerical cutpoints are then applied to fresh validation seeds 52-61
+for both One2Six and the Physical IID negative control. Continuous monetary
+response and conditional player edge are primary. Initial-deal composition is
+retained only as a mechanism check that the frozen bands still order future
+cards as expected. Monetary streaks and hidden source state are not predictors.
+
+The fixed strategy is deliberately unchanged. Player-action optimization is a
+later research phase and is justified only if observable states first show
+credible conditional profitability. Such later strategy work may differ from
+ordinary basic strategy because the conditional expected card distribution is
+not necessarily the ordinary baseline distribution.
+
+Run a smoke experiment:
+
+```bash
+python scripts/run_conditional_profitability_experiment.py \
+  --development-seeds 42,43 \
+  --validation-seeds 52,53 \
+  --development-rounds-per-seed 2000 \
+  --validation-rounds-per-seed 5000 \
+  --burn-in-rounds 100 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/conditional_profitability_smoke
+```
+
+Run the full held-out experiment:
+
+```bash
+python scripts/run_conditional_profitability_experiment.py \
+  --development-seeds 42,43,44,45,46,47,48,49,50,51 \
+  --validation-seeds 52,53,54,55,56,57,58,59,60,61 \
+  --development-rounds-per-seed 20000 \
+  --validation-rounds-per-seed 100000 \
+  --burn-in-rounds 1000 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/conditional_profitability_validation
+```
+
+## Score-Conditioned Player Actions
+
+The action-value phase evaluates legal player decisions from paired copies of
+the same complete game and card-source state. Natural one-box sessions continue
+under the unchanged fixed strategy; at each sampled decision, every legal action
+is forced once on an isolated branch and all later choices return to the fixed
+strategy. No revised strategy is deployed during state generation or reporting.
+
+Decision-time composition differs from the pre-bet score. The preceding rack
+has already returned after the complete initial deal and therefore enters the
+freshest returned age band. Every exposed player card across current split hands
+and the dealer upcard form a new full-weight table cohort. Hit and split cards
+enter that cohort before later decisions, while older returned batches age by
+dealt-card count. Each observable card or batch contributes exactly once.
+
+Low-card, ten-value, and ace shifts remain separate. Development One2Six states
+on seeds 62-66 define feature-only composition cutpoints and candidate actions;
+held-out seeds 67-71 cannot add or alter candidates. Generic baseline strategy
+corrections are distinguished from One2Six-specific deviations. Improvements
+that reduce losses in poor states remain strategically relevant even when they
+do not create positive EV.
+
+Run a smoke experiment:
+
+```bash
+python scripts/run_score_conditioned_action_values.py \
+  --development-seeds 62,63 \
+  --validation-seeds 67,68 \
+  --decision-states-per-seed 500 \
+  --burn-in-rounds 100 \
+  --base-bet 10 \
+  --minimum-total-state-count 20 \
+  --minimum-per-seed-state-count 5 \
+  --minimum-seed-sign-count 2 \
+  --output-dir experiments/outputs/score_conditioned_action_values_smoke
+```
+
+Run the full experiment:
+
+```bash
+python scripts/run_score_conditioned_action_values.py \
+  --development-seeds 62,63,64,65,66 \
+  --validation-seeds 67,68,69,70,71 \
+  --decision-states-per-seed 10000 \
+  --burn-in-rounds 1000 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/score_conditioned_action_values
+```
+
+## Monetary Streak Dependence Audit
+
+Matching streak means or upper quantiles does not establish geometric run
+lengths or independent round outcomes. The streak audit compares complete win
+and loss run distributions, survival tails, and continuation probabilities
+against source-and-seed geometric benchmarks. Continuation probability is the
+primary shape diagnostic because an independent resolved-outcome process has a
+constant continuation probability at every run length.
+
+Pushes are removed from the resolved W/L sequence used for geometric analysis,
+but they remain neutral in the live pre-bet streak: they neither increase nor
+break it. A run already active after burn-in is marked left-censored, and the
+final open run is right-censored. Those boundary runs are excluded from primary
+PMFs while still contributing to continuation risk sets wherever continuation
+is observable.
+
+Physical IID is the required negative control. Live streak sign and length are
+retained as possible strategy features only if they improve contiguous
+held-out prediction beyond the unchanged frozen fading-exclusion score. This
+audit does not select a betting or playing policy.
+
+Run a smoke audit:
+
+```bash
+python scripts/run_streak_dependence_audit.py \
+  --seeds 72,73 \
+  --rounds-per-seed 5000 \
+  --burn-in-rounds 100 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/streak_dependence_audit_smoke
+```
+
+Run the full audit:
+
+```bash
+python scripts/run_streak_dependence_audit.py \
+  --seeds 72,73,74,75,76,77,78,79,80,81 \
+  --rounds-per-seed 100000 \
+  --burn-in-rounds 1000 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/streak_dependence_audit_10x100k
+```
+
+## Extreme-Tail Profitability
+
+The strongest broad high-rich decile approached break-even, so the next test
+uses frozen one-, 2.5-, five-, ten-, and twenty-percent tails to determine
+whether a rarer observable state becomes positive EV under the unchanged
+one-box strategy. Cutpoints use One2Six development scores only; monetary
+validation outcomes cannot alter them. Physical IID remains the negative
+control. Selective entry is the simplest possible advantage route, but it is
+not tested as a policy unless positive conditional EV first passes the strict
+held-out gate.
+
+Insurance is audited at its actual post-initial-deal decision boundary. Because
+this is a no-hole-card game, player hits, doubles, and splits can occur before
+the dealer's insured second card. Ace-up insurance and even money use the exact
+one-third break-even probability. Rules permit dealer-ten insurance at a
+one-eleventh threshold, but operational availability is unconfirmed. Monetary
+streaks are not strategy features, and this phase does not vary bets, actions,
+or box count.
+
+```bash
+python scripts/run_extreme_tail_profitability.py \
+  --development-seeds 82,83,84,85,86 \
+  --validation-seeds 87,88,89,90,91,92,93,94,95,96 \
+  --development-rounds-per-seed 20000 \
+  --validation-rounds-per-seed 100000 \
+  --burn-in-rounds 1000 \
+  --base-bet 10 \
+  --output-dir experiments/outputs/extreme_tail_profitability
+```
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 or later.
-
-Copyright (C) 2026 Andrew Roudenko.
 
 See [LICENSE](LICENSE) for the full license text.

@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 """Card source abstractions for deterministic and stochastic draws."""
 
@@ -148,6 +147,11 @@ class PhysicalIidCardSource:
     def physical_card_count(self) -> int:
         """Return the number of labelled physical cards."""
         return len(self._physical_cards)
+
+    @property
+    def draw_count(self) -> int:
+        """Return the number of draw events emitted by this source."""
+        return self._next_draw_id
 
     def before_round(self) -> None:
         """No-op round hook for physical IID draws."""
@@ -406,6 +410,9 @@ class One2SixConfig:
     ingest_policy: str = "instant_on_accept"
     fallback_when_no_eligible_slot: str = "choose_fullest_occupied"
     strict_invariants: bool = True
+    retain_event_telemetry: bool = True
+    retain_ejection_records: bool = True
+    retain_accepted_discard_history: bool = True
 
     def __post_init__(self) -> None:
         if self.deck_count <= 0:
@@ -459,6 +466,9 @@ class One2SixCardSource:
         self._round_robin_next_slot = 0
         self._telemetry: list[dict[str, object]] = []
         self._ejections: list[dict[str, object]] = []
+        self._ejection_count = 0
+        self._fallback_ejection_count = 0
+        self._accepted_discard_batch_count = 0
         self.accepted_discards: list[Card] = []
         self.accepted_discard_batches: list[list[Card]] = []
 
@@ -498,15 +508,15 @@ class One2SixCardSource:
 
     @property
     def accepted_discard_batch_count(self) -> int:
-        return len(self.accepted_discard_batches)
+        return self._accepted_discard_batch_count
 
     @property
     def ejection_count(self) -> int:
-        return len(self._ejections)
+        return self._ejection_count
 
     @property
     def fallback_ejection_count(self) -> int:
-        return sum(1 for record in self._ejections if record["used_fallback"])
+        return self._fallback_ejection_count
 
     @property
     def draw_count(self) -> int:
@@ -541,8 +551,10 @@ class One2SixCardSource:
     def accept_discards(self, cards: Sequence[Card]) -> None:
         """Accept ordered discards into the feeder and ingest immediately."""
         batch = list(cards)
-        self.accepted_discard_batches.append(batch)
-        self.accepted_discards.extend(batch)
+        self._accepted_discard_batch_count += 1
+        if self.config.retain_accepted_discard_history:
+            self.accepted_discard_batches.append(batch)
+            self.accepted_discards.extend(batch)
         for card in batch:
             self._record_event(event_type="accepted_discard", card=card)
             self._feeder.append(card)
@@ -675,16 +687,19 @@ class One2SixCardSource:
         shelf.clear()
         buffer_size_before = len(self._output_buffer)
         self._output_buffer.extend(ejected)
-        record = {
-            "event_sequence": self._next_event_sequence(),
-            "shelf_id": shelf_id,
-            "group_size": len(ejected),
-            "physical_ids": [card.physical_id for card in ejected],
-            "used_fallback": used_fallback,
-            "buffer_size_before": buffer_size_before,
-            "buffer_size_after": len(self._output_buffer),
-        }
-        self._ejections.append(record)
+        self._ejection_count += 1
+        self._fallback_ejection_count += int(used_fallback)
+        if self.config.retain_ejection_records:
+            record = {
+                "event_sequence": self._next_event_sequence(),
+                "shelf_id": shelf_id,
+                "group_size": len(ejected),
+                "physical_ids": [card.physical_id for card in ejected],
+                "used_fallback": used_fallback,
+                "buffer_size_before": buffer_size_before,
+                "buffer_size_after": len(self._output_buffer),
+            }
+            self._ejections.append(record)
         for card in ejected:
             self._record_event(
                 event_type="entered_output_buffer",
@@ -702,6 +717,8 @@ class One2SixCardSource:
         shelf_size_after: int | None = None,
         buffer_size_after: int | None = None,
     ) -> None:
+        if not self.config.retain_event_telemetry:
+            return
         self._telemetry.append(
             {
                 "event_sequence": self._next_event_sequence(),

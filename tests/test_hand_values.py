@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 from shufflemaster_sim.cards import Card, Rank
 from shufflemaster_sim.hand_values import (
     hand_value,
+    hand_value_from_ranks,
     is_bust,
     is_natural_blackjack,
     split_value,
+    split_value_from_rank,
 )
 
 
@@ -76,3 +77,10 @@ def test_split_ace_ten_is_twenty_one_but_not_blackjack() -> None:
 
 def test_ten_value_cards_share_split_value() -> None:
     assert split_value(card("T")) == split_value(card("Q")) == 10
+
+
+def test_rank_only_helpers_match_card_helpers() -> None:
+    assert hand_value_from_ranks(("A", "6", "T")) == hand_value(
+        [card("A"), card("6"), card("T")]
+    )
+    assert split_value_from_rank("Q") == split_value(card("Q")) == 10

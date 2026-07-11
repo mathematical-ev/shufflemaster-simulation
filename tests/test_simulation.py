@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 from shufflemaster_sim.simulation import SimulationConfig, run_casino_blackjack_baseline
 

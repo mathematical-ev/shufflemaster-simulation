@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 from collections import Counter, deque
 
@@ -58,6 +57,27 @@ def test_accepted_discards_preserve_identity_and_batch_order() -> None:
     assert [card.physical_id for card in source.accepted_discards] == [
         card.physical_id for card in discards
     ]
+
+
+def test_compact_diagnostics_keep_counts_without_retaining_histories() -> None:
+    source = One2SixCardSource(
+        config=One2SixConfig(
+            retain_event_telemetry=False,
+            retain_ejection_records=False,
+            retain_accepted_discard_history=False,
+        ),
+        seed=42,
+    )
+    discards = [source.draw_card(), source.draw_card()]
+
+    source.accept_discards(discards)
+
+    assert source.accepted_discard_batch_count == 1
+    assert source.ejection_count > 0
+    assert source.telemetry_records() == []
+    assert source.ejection_records() == []
+    assert source.accepted_discard_batches == []
+    assert source.accepted_discards == []
 
 
 def test_accepted_cards_are_fed_in_order_for_fixed_slot_rule() -> None:
@@ -193,7 +213,7 @@ def test_different_seed_may_change_initial_draw_sequence() -> None:
     ]
 
 
-def test_star_baseline_runs_with_one2six_source() -> None:
+def test_casino_baseline_runs_with_one2six_source() -> None:
     result = run_casino_blackjack_baseline(
         SimulationConfig(rounds=25, seed=42, card_source="one2six")
     )

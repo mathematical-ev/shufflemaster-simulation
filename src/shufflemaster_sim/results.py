@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 """Result records and aggregation for simulations."""
 
@@ -124,6 +123,8 @@ class ResultRecorder:
     round_results: list[RoundResult] = field(default_factory=list)
     box_results: dict[int, BoxResult] = field(default_factory=dict)
     cumulative_profit: float = 0.0
+    retain_round_results: bool = True
+    rounds_recorded: int = 0
 
     def record_round(self, table: TableState) -> RoundResult:
         """Record one settled table round."""
@@ -143,7 +144,9 @@ class ResultRecorder:
             net_profit=round_profit,
             cumulative_profit_after_round=self.cumulative_profit,
         )
-        self.round_results.append(round_result)
+        self.rounds_recorded += 1
+        if self.retain_round_results:
+            self.round_results.append(round_result)
 
         for box in table.boxes:
             self._record_box(box)
@@ -156,7 +159,7 @@ class ResultRecorder:
         initial_wagered = sum(box.initial_wagered for box in self.box_results.values())
         action_wagered = sum(box.action_wagered for box in self.box_results.values())
         total_wagered = sum(box.total_wagered for box in self.box_results.values())
-        rounds_played = len(self.round_results)
+        rounds_played = self.rounds_recorded
         total_net_profit = self.cumulative_profit
         edge_per_initial_wager = (
             total_net_profit / initial_wagered if initial_wagered else 0.0

@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
@@ -11,7 +10,7 @@ from shufflemaster_sim.games.casino_blackjack import (
     CasinoBlackjackConfig,
     CasinoBlackjackGame,
 )
-from shufflemaster_sim.state import BoxState, HandState, TableState
+from shufflemaster_sim.state import BlackjackDecisionState, TableState
 
 
 class QueueStrategy:
@@ -21,15 +20,10 @@ class QueueStrategy:
     def choose_action(
         self,
         *,
-        table: TableState,
-        box: BoxState,
-        hand: HandState,
-        dealer_upcard: Card,
-        legal_actions: frozenset[ActionType],
+        decision: BlackjackDecisionState,
     ) -> GameAction:
-        _ = table, box, hand, dealer_upcard
         action = self._actions.pop(0)
-        assert action in legal_actions
+        assert action in decision.legal_actions
         return GameAction(action_type=action)
 
 
@@ -37,14 +31,9 @@ class StandOrHitStrategy:
     def choose_action(
         self,
         *,
-        table: TableState,
-        box: BoxState,
-        hand: HandState,
-        dealer_upcard: Card,
-        legal_actions: frozenset[ActionType],
+        decision: BlackjackDecisionState,
     ) -> GameAction:
-        _ = table, box, hand, dealer_upcard
-        if ActionType.STAND in legal_actions:
+        if ActionType.STAND in decision.legal_actions:
             return GameAction(action_type=ActionType.STAND)
         return GameAction(action_type=ActionType.HIT)
 
@@ -99,7 +88,7 @@ def draw_ids(cards: Iterable[Card]) -> list[int]:
 
 
 def test_bust_hand_cards_are_discarded_immediately_and_not_again() -> None:
-    game = CasinoBlackjackGame()
+    game = CasinoBlackjackGame(CasinoBlackjackConfig(burn_initial_card=False))
     source = TrackingCardSource(
         [("T", "spades"), ("6", "clubs"), ("6", "hearts"), ("T", "diamonds")]
     )
@@ -112,7 +101,7 @@ def test_bust_hand_cards_are_discarded_immediately_and_not_again() -> None:
 
 
 def test_live_player_hand_stays_on_layout_until_final_collection() -> None:
-    game = CasinoBlackjackGame()
+    game = CasinoBlackjackGame(CasinoBlackjackConfig(burn_initial_card=False))
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -146,7 +135,7 @@ def test_live_player_hand_stays_on_layout_until_final_collection() -> None:
 
 
 def test_split_bust_discards_only_busted_hand_until_final_collection() -> None:
-    game = CasinoBlackjackGame()
+    game = CasinoBlackjackGame(CasinoBlackjackConfig(burn_initial_card=False))
     source = TrackingCardSource(
         [
             ("8", "spades"),
@@ -183,7 +172,7 @@ def test_split_bust_discards_only_busted_hand_until_final_collection() -> None:
 
 
 def test_previous_rack_returns_only_after_next_initial_deal() -> None:
-    game = CasinoBlackjackGame()
+    game = CasinoBlackjackGame(CasinoBlackjackConfig(burn_initial_card=False))
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -211,7 +200,12 @@ def test_previous_rack_returns_only_after_next_initial_deal() -> None:
 
 
 def test_previous_rack_is_not_returned_when_shuffling_device_disabled() -> None:
-    game = CasinoBlackjackGame(CasinoBlackjackConfig(use_shuffling_device=False))
+    game = CasinoBlackjackGame(
+        CasinoBlackjackConfig(
+            use_shuffling_device=False,
+            burn_initial_card=False,
+        )
+    )
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -232,7 +226,7 @@ def test_previous_rack_is_not_returned_when_shuffling_device_disabled() -> None:
 
 
 def test_current_blackjack_discards_are_not_in_previous_rack_return() -> None:
-    game = CasinoBlackjackGame()
+    game = CasinoBlackjackGame(CasinoBlackjackConfig(burn_initial_card=False))
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -261,7 +255,7 @@ def test_current_blackjack_discards_are_not_in_previous_rack_return() -> None:
 
 
 def test_source_receives_discards_in_same_order_as_ordered_rack() -> None:
-    game = CasinoBlackjackGame()
+    game = CasinoBlackjackGame(CasinoBlackjackConfig(burn_initial_card=False))
     source = TrackingCardSource(
         [
             ("T", "spades"),
@@ -285,8 +279,33 @@ def test_source_receives_discards_in_same_order_as_ordered_rack() -> None:
     )
 
 
+def test_discard_validation_tracks_draw_events_for_physical_iid_null() -> None:
+    shared_physical_card = Card(
+        rank="T",
+        suit="spades",
+        physical_id="physical-iid:repeated",
+        draw_id=-1,
+    )
+    source = TrackingCardSource(
+        [
+            shared_physical_card,
+            shared_physical_card,
+            shared_physical_card,
+            ("7", "clubs"),
+        ]
+    )
+    game = CasinoBlackjackGame(CasinoBlackjackConfig(burn_initial_card=False))
+
+    table = play_round(game, source, [ActionType.STAND])
+
+    assert len(table.discard_rack) == len({card.draw_id for card in table.discard_rack})
+    assert len({card.physical_id for card in table.discard_rack}) < len(
+        table.discard_rack
+    )
+
+
 def test_finite_shoe_receives_previous_rack_after_next_initial_deal() -> None:
-    game = CasinoBlackjackGame()
+    game = CasinoBlackjackGame(CasinoBlackjackConfig(burn_initial_card=False))
     source = FiniteShoeCardSource(deck_count=1, seed=42)
     first_table = game.play_round(
         round_index=0,

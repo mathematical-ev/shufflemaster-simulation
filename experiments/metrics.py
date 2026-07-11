@@ -1,15 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 """Metrics for experiment-level validation."""
 
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass, field
 from math import exp, pi, sqrt
 from statistics import median
-from typing import Any
+from typing import Any, Literal
 
 from shufflemaster_sim.cards import RANKS, SUITS, Card, Rank, Suit
 
@@ -206,37 +206,175 @@ def source_draw_metrics(
     }
 
 
+OutcomeKind = Literal["win", "loss", "push"]
+
+
+def classify_monetary_outcome(net_result: float) -> OutcomeKind:
+    """Classify one box's completed-round monetary result."""
+    if net_result > 0:
+        return "win"
+    if net_result < 0:
+        return "loss"
+    return "push"
+
+
+@dataclass(slots=True)
+class MonetaryStreakTracker:
+    """Track monetary win/loss streaks online while pushes remain neutral."""
+
+    rounds: int = 0
+    winning_rounds: int = 0
+    losing_rounds: int = 0
+    push_rounds: int = 0
+    win_streak_frequency: Counter[int] = field(default_factory=Counter)
+    loss_streak_frequency: Counter[int] = field(default_factory=Counter)
+    _current_kind: Literal["win", "loss"] | None = None
+    _current_length: int = 0
+    _finalized: bool = False
+
+    def observe(self, net_result: float) -> None:
+        """Observe one completed box result without retaining the round."""
+        if self._finalized:
+            raise RuntimeError("Cannot observe rounds after streak finalization.")
+        self.rounds += 1
+        outcome = classify_monetary_outcome(net_result)
+        if outcome == "push":
+            self.push_rounds += 1
+            return
+        if outcome == "win":
+            self.winning_rounds += 1
+        else:
+            self.losing_rounds += 1
+
+        if self._current_kind is None:
+            self._current_kind = outcome
+            self._current_length = 1
+        elif self._current_kind == outcome:
+            self._current_length += 1
+        else:
+            self._flush_open_streak()
+            self._current_kind = outcome
+            self._current_length = 1
+
+    def finalize(self) -> None:
+        """Close an open streak at the end of one independent seed run."""
+        if self._finalized:
+            return
+        self._flush_open_streak()
+        self._finalized = True
+
+    def summary(self) -> dict[str, Any]:
+        """Return reconciled outcome counts and compact streak summaries."""
+        self.finalize()
+        summary = {
+            "rounds": self.rounds,
+            "winning_rounds": self.winning_rounds,
+            "losing_rounds": self.losing_rounds,
+            "push_rounds": self.push_rounds,
+            "win_rate": _rate(self.winning_rounds, self.rounds),
+            "loss_rate": _rate(self.losing_rounds, self.rounds),
+            "push_rate": _rate(self.push_rounds, self.rounds),
+            "win_streaks": streak_frequency_summary(self.win_streak_frequency),
+            "loss_streaks": streak_frequency_summary(self.loss_streak_frequency),
+        }
+        validate_streak_reconciliation(summary)
+        return summary
+
+    def _flush_open_streak(self) -> None:
+        if self._current_kind == "win" and self._current_length > 0:
+            self.win_streak_frequency[self._current_length] += 1
+        elif self._current_kind == "loss" and self._current_length > 0:
+            self.loss_streak_frequency[self._current_length] += 1
+        self._current_kind = None
+        self._current_length = 0
+
+
+def streak_frequency_summary(frequency: Mapping[int, int]) -> dict[str, Any]:
+    """Summarize a compact integer streak-frequency distribution."""
+    ordered = dict(
+        sorted((int(length), int(count)) for length, count in frequency.items())
+    )
+    streak_count = sum(ordered.values())
+    represented_rounds = sum(length * count for length, count in ordered.items())
+    return {
+        "streak_count": streak_count,
+        "represented_rounds": represented_rounds,
+        "minimum": min(ordered) if ordered else None,
+        "mean": _rate(represented_rounds, streak_count) if streak_count else None,
+        "median": _frequency_median(ordered),
+        "p75": _frequency_nearest_rank(ordered, 0.75),
+        "p90": _frequency_nearest_rank(ordered, 0.90),
+        "p95": _frequency_nearest_rank(ordered, 0.95),
+        "p99": _frequency_nearest_rank(ordered, 0.99),
+        "maximum": max(ordered) if ordered else None,
+        "frequency": ordered,
+    }
+
+
+def validate_streak_reconciliation(summary: Mapping[str, Any]) -> None:
+    """Raise if round outcomes and completed streaks do not reconcile."""
+    rounds = summary["rounds"]
+    wins = summary["winning_rounds"]
+    losses = summary["losing_rounds"]
+    pushes = summary["push_rounds"]
+    win_streaks = summary["win_streaks"]
+    loss_streaks = summary["loss_streaks"]
+    if wins + losses + pushes != rounds:
+        raise RuntimeError(
+            "Round outcome counts do not reconcile with completed rounds."
+        )
+    if win_streaks["represented_rounds"] != wins:
+        raise RuntimeError("Win streak lengths do not reconcile with winning rounds.")
+    if loss_streaks["represented_rounds"] != losses:
+        raise RuntimeError("Loss streak lengths do not reconcile with losing rounds.")
+    if win_streaks["streak_count"] != sum(win_streaks["frequency"].values()):
+        raise RuntimeError("Win streak count does not reconcile with its frequency.")
+    if loss_streaks["streak_count"] != sum(loss_streaks["frequency"].values()):
+        raise RuntimeError("Loss streak count does not reconcile with its frequency.")
+
+
+def signed_streak_histogram_data(
+    win_frequency: Mapping[int, int],
+    loss_frequency: Mapping[int, int],
+    *,
+    display_limit: int = 20,
+) -> dict[str, Any]:
+    """Return signed display bins with explicit long-streak overflow bins."""
+    if display_limit <= 0:
+        raise ValueError("display_limit must be positive.")
+    counts = {
+        signed_length: 0
+        for signed_length in range(-display_limit - 1, display_limit + 2)
+        if signed_length != 0
+    }
+    for length, frequency in loss_frequency.items():
+        bin_value = -min(int(length), display_limit + 1)
+        counts[bin_value] += int(frequency)
+    for length, frequency in win_frequency.items():
+        bin_value = min(int(length), display_limit + 1)
+        counts[bin_value] += int(frequency)
+    total_streaks = sum(counts.values())
+    return {
+        "display_limit": display_limit,
+        "counts": dict(sorted(counts.items())),
+        "proportions": {
+            value: _rate(count, total_streaks)
+            for value, count in sorted(counts.items())
+        },
+        "total_streaks": total_streaks,
+        "negative_overflow_label": f"<= -{display_limit + 1}",
+        "positive_overflow_label": f">= +{display_limit + 1}",
+    }
+
+
 def streak_distributions(outcomes: Iterable[float]) -> dict[str, dict[int, int]]:
     """Return streak distributions where pushes do not break streaks."""
-    win_streaks: Counter[int] = Counter()
-    loss_streaks: Counter[int] = Counter()
-    current_kind: str | None = None
-    current_length = 0
-
-    def flush() -> None:
-        nonlocal current_kind, current_length
-        if current_kind == "win" and current_length > 0:
-            win_streaks[current_length] += 1
-        elif current_kind == "loss" and current_length > 0:
-            loss_streaks[current_length] += 1
-        current_kind = None
-        current_length = 0
-
+    tracker = MonetaryStreakTracker()
     for outcome in outcomes:
-        if outcome == 0:
-            continue
-        outcome_kind = "win" if outcome > 0 else "loss"
-        if current_kind is None:
-            current_kind = outcome_kind
-            current_length = 1
-        elif current_kind == outcome_kind:
-            current_length += 1
-        else:
-            flush()
-            current_kind = outcome_kind
-            current_length = 1
-    flush()
-
+        tracker.observe(outcome)
+    summary = tracker.summary()
+    win_streaks = summary["win_streaks"]["frequency"]
+    loss_streaks = summary["loss_streaks"]["frequency"]
     signed = Counter({length: count for length, count in win_streaks.items()})
     signed.update({-length: count for length, count in loss_streaks.items()})
     return {
@@ -244,6 +382,37 @@ def streak_distributions(outcomes: Iterable[float]) -> dict[str, dict[int, int]]
         "loss_streaks": dict(sorted(loss_streaks.items())),
         "signed_streaks": dict(sorted(signed.items())),
     }
+
+
+def _frequency_value_at_rank(frequency: Mapping[int, int], rank: int) -> int | None:
+    cumulative = 0
+    for value, count in sorted(frequency.items()):
+        cumulative += count
+        if cumulative >= rank:
+            return value
+    return None
+
+
+def _frequency_median(frequency: Mapping[int, int]) -> float | None:
+    count = sum(frequency.values())
+    if count == 0:
+        return None
+    lower = _frequency_value_at_rank(frequency, (count + 1) // 2)
+    upper = _frequency_value_at_rank(frequency, (count + 2) // 2)
+    if lower is None or upper is None:
+        return None
+    return (lower + upper) / 2.0
+
+
+def _frequency_nearest_rank(
+    frequency: Mapping[int, int],
+    probability: float,
+) -> int | None:
+    count = sum(frequency.values())
+    if count == 0:
+        return None
+    rank = max(1, int(probability * count + 0.999999999999))
+    return _frequency_value_at_rank(frequency, rank)
 
 
 def theoretical_streak_probabilities(

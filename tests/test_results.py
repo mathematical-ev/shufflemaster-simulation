@@ -1,5 +1,4 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 from shufflemaster_sim.cards import Card
 from shufflemaster_sim.results import ResultRecorder
@@ -116,6 +115,124 @@ def test_result_recorder_counts_blackjack_pushes_as_blackjacks() -> None:
 
     assert result.box_results[0].blackjacks == 1
     assert result.box_results[0].pushes == 1
+
+
+def test_blackjack_metric_excludes_split_and_multi_card_twenty_one() -> None:
+    hands = [
+        HandState(
+            hand_id=0,
+            cards=[
+                Card("A", "spades", "split-ace", 0),
+                Card("T", "hearts", "split-ten", 1),
+            ],
+            wager=10.0,
+            is_split_hand=True,
+            blackjack_eligible=False,
+            outcome_label="win",
+            net_result=10.0,
+        ),
+        HandState(
+            hand_id=1,
+            cards=[
+                Card("A", "clubs", "multi-ace", 2),
+                Card("5", "clubs", "multi-five-1", 3),
+                Card("5", "diamonds", "multi-five-2", 4),
+            ],
+            wager=10.0,
+            outcome_label="win",
+            net_result=10.0,
+        ),
+    ]
+    table = TableState(
+        boxes=[BoxState(box_id=1, base_bet=10.0, hands=hands)],
+        dealer=DealerState(),
+        round_index=0,
+    )
+    recorder = ResultRecorder(base_bet=10.0, box_count=1)
+
+    recorder.record_round(table)
+
+    assert recorder.build_result().box_results[0].blackjacks == 0
+
+
+def test_action_metrics_count_actual_double_and_split_actions_once() -> None:
+    table = TableState(
+        boxes=[
+            BoxState(
+                box_id=1,
+                base_bet=10.0,
+                hands=[
+                    HandState(
+                        hand_id=0,
+                        cards=[],
+                        wager=10.0,
+                        is_split_hand=True,
+                        is_doubled=True,
+                        outcome_label="win",
+                        net_result=20.0,
+                    ),
+                    HandState(
+                        hand_id=1,
+                        cards=[],
+                        wager=10.0,
+                        is_split_hand=True,
+                        outcome_label="loss",
+                        net_result=-10.0,
+                    ),
+                ],
+            )
+        ],
+        dealer=DealerState(),
+        round_index=0,
+    )
+    recorder = ResultRecorder(base_bet=10.0, box_count=1)
+
+    recorder.record_round(table)
+    box = recorder.build_result().box_results[0]
+
+    assert box.doubles == 1
+    assert box.splits == 1
+    assert box.hands_resolved == 2
+
+
+def test_double_eligibility_without_action_does_not_increment_metric() -> None:
+    hand = HandState(
+        hand_id=0,
+        cards=[
+            Card("5", "spades", "eligible-five", 0),
+            Card("6", "spades", "eligible-six", 1),
+        ],
+        wager=10.0,
+        is_doubled=False,
+        outcome_label="win",
+        net_result=10.0,
+    )
+    table = TableState(
+        boxes=[BoxState(box_id=1, base_bet=10.0, hands=[hand])],
+        dealer=DealerState(),
+        round_index=0,
+    )
+    recorder = ResultRecorder(base_bet=10.0, box_count=1)
+
+    recorder.record_round(table)
+
+    assert recorder.build_result().box_results[0].doubles == 0
+
+
+def test_result_recorder_can_aggregate_without_retaining_round_records() -> None:
+    recorder = ResultRecorder(
+        base_bet=10.0,
+        box_count=1,
+        retain_round_results=False,
+    )
+    recorder.record_round(settled_table(0, 10.0))
+    recorder.record_round(settled_table(1, -10.0))
+
+    result = recorder.build_result()
+
+    assert result.rounds_played == 2
+    assert result.round_results == []
+    assert result.net_profit == 0.0
 
 
 def test_result_recorder_separates_initial_action_and_total_wagers() -> None:

@@ -73,6 +73,105 @@ specified and tests exist.
 - Do not treat one recycle batch size as robust evidence.
 - Keep source-level recurrence structure separate from game-level
   exploitability analysis.
+- Use the same fixed strategy implementation for card-source comparisons.
+- Card-source experiments must not branch player decisions by source type,
+  source state, physical identity, telemetry, or prior-card history.
+- Test rule correctness with deterministic card sequences rather than random
+  simulations.
+- The current casino blackjack rule profile stands on soft 17.
+- Do not interpret one random monetary result as evidence of an advantage.
+- Do not add venue-specific or personal identifying names to tracked files.
+- Use multiple independent seeds before interpreting small monetary source
+  differences.
+- Distinguish initial equal-value pair opportunities from actual split actions.
+- Use seed-level replication as the primary uncertainty unit when a source can
+  create serial dependence between rounds.
+- Do not use naive round-IID or binomial assumptions as the sole evidence for a
+  One2Six source difference.
+- Preserve generic public terminology and repository privacy rules in reports
+  and generated labels.
+- Define a round-level monetary streak from the total settled net result of the
+  entire active box, after combining all original and split hands.
+- Classify positive box net as a win, negative box net as a loss, and zero as a
+  push.
+- Pushes do not count toward and do not break an open win or loss streak.
+- Finalize every open streak at an independent seed boundary; never join
+  streaks across seeds.
+- Use negative signed lengths for loss streaks, positive signed lengths for win
+  streaks, and omit zero from streak distributions.
+- Do not optimize box count before demonstrating an observable out-of-sample
+  signal.
+- Use identical complete starting states for counterfactual action comparisons.
+- Never expose physical IDs, RNG state, buffers, shelves, feeder contents, or
+  other internal source state to player-facing features or strategies.
+- Use independent seeds as the primary uncertainty unit for counterfactual
+  state-action estimates.
+- Use Physical IID as the negative control for observable-state experiments.
+- Do not interpret one favourable state bucket as an advantage strategy.
+- Keep experiment runtime proportional to the live research question.
+- Separate current-rack exclusion from returned-batch re-entry response.
+- Use player-observable composition features only; hidden source state may
+  establish identical probes but must never enter predictors or exports.
+- Preserve ace and ten-value response categories separately.
+- Test observable card composition before returning to blackjack EV endpoints.
+- Use independent seeds as the primary uncertainty unit for response slopes.
+- Do not optimize box count before a stable observable response kernel exists.
+- Do not infer that a globally stationary source is IID at every conditional
+  state.
+- Do not retune frozen fading-exclusion weights on held-out seeds.
+- Use new independent seeds for held-out signal validation and retain Physical
+  IID as a required null control.
+- Combine all overlapping active observable cohorts into one state before any
+  strategy or EV optimization work; each returned batch belongs to one
+  dealt-card age band only.
+- Distinguish out-of-sample signal validation from strategy and EV
+  optimization.
+- Maintain player/dealer and ace/ten-value asymmetry in initial-deal analyses.
+- Keep experiment runtime proportional to the current research question.
+- Stop adding composition diagnostics once an observable signal is sufficiently
+  validated; translate validated signals into held-out conditional EV.
+- Do not optimize action decisions before establishing state-conditioned
+  profitability under the unchanged source-blind baseline strategy.
+- Define score bands from score distributions only, without monetary outcomes,
+  and freeze them before processing fresh independent validation seeds.
+- Require Physical IID as the negative control for conditional-profitability
+  experiments.
+- Preserve strategy/source blindness during baseline EV evaluation.
+- Keep composition metrics only as mechanism checks once monetary EV becomes
+  the primary endpoint.
+- Optimize player decisions across both favourable and unfavourable observable
+  states; loss reduction is useful even when a state remains negative EV.
+- Calculate composition at the actual player-decision boundary, after the prior
+  rack return and with all exposed table cards included exactly once.
+- Keep low-card, ten-value, and ace effects separate in action-value work.
+- Estimate legal actions with paired counterfactual branches from identical
+  complete game, source, and RNG states.
+- Distinguish generic baseline strategy corrections from source-specific
+  composition deviations.
+- Do not deploy a revised strategy before candidate discovery and independent
+  held-out validation are complete.
+- Do not infer resolved-outcome independence from matching streak means or
+  quantiles; compare complete run distributions, survival, and continuation
+  hazards against source-specific geometric benchmarks.
+- Preserve canonical monetary streak semantics: aggregate the complete box net,
+  treat positive as win and negative as loss, and let pushes neither increment
+  nor break the current streak.
+- Keep boundary-censored runs out of primary geometric PMFs and include them in
+  continuation risk sets only where continuation is observable.
+- Test whether streak state adds held-out predictive value beyond the frozen
+  fading-exclusion score before retaining it as a strategy feature.
+- Use independent-seed uncertainty and paired One2Six-minus-Physical-IID source
+  comparisons for streak-shape and predictive-value claims.
+- Keep streak-audit runtime proportional to the live advantage question.
+- Prioritise held-out conditional EV over additional descriptive diagnostics.
+- Test frozen extreme score tails before adding betting, action, or box-count
+  complexity; define cutpoints without monetary outcomes.
+- Retain Physical IID as the negative control for every extreme-tail claim.
+- Do not assume a rules-permitted optional wager is operationally available.
+- Require a robust seed-level margin over exact insurance and even-money
+  break-even thresholds before treating them as feasible.
+- Keep extreme-tail and insurance-audit runtime proportional to the live
+  advantage question.
 
 ## Important Directories
 
@@ -111,7 +210,6 @@ New Python source files should include:
 
 ```python
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 ```
 
 Generated experiment outputs under `experiments/outputs/` are not source code

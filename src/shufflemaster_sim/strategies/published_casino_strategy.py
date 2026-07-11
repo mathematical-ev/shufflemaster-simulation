@@ -1,14 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
-"""Approximate published H17 multi-deck strategy constrained by house rules."""
+"""Approximate published S17 multi-deck strategy constrained by house rules."""
 
 from typing import Final
 
 from shufflemaster_sim.actions import ActionType, GameAction
-from shufflemaster_sim.cards import Card
-from shufflemaster_sim.hand_values import hand_value, split_value
-from shufflemaster_sim.state import BoxState, HandState, TableState
+from shufflemaster_sim.cards import Rank
+from shufflemaster_sim.hand_values import hand_value_from_ranks, split_value_from_rank
+from shufflemaster_sim.state import BlackjackDecisionState
 
 DEALER_UPCARDS: Final[tuple[str, ...]] = (
     "2",
@@ -30,7 +29,7 @@ HARD_TOTALS: Final[dict[str, tuple[str, ...]]] = {
     "8": ("H", "H", "H", "H", "H", "H", "H", "H", "H", "H"),
     "9": ("H", "D", "D", "D", "D", "H", "H", "H", "H", "H"),
     "10": ("D", "D", "D", "D", "D", "D", "D", "D", "H", "H"),
-    "11": ("D", "D", "D", "D", "D", "D", "D", "D", "D", "D"),
+    "11": ("D", "D", "D", "D", "D", "D", "D", "D", "D", "H"),
     "12": ("H", "H", "S", "S", "S", "H", "H", "H", "H", "H"),
     "13": ("S", "S", "S", "S", "S", "H", "H", "H", "H", "H"),
     "14": ("S", "S", "S", "S", "S", "H", "H", "H", "H", "H"),
@@ -45,8 +44,8 @@ SOFT_TOTALS: Final[dict[int, tuple[str, ...]]] = {
     15: ("H", "H", "D", "D", "D", "H", "H", "H", "H", "H"),
     16: ("H", "H", "D", "D", "D", "H", "H", "H", "H", "H"),
     17: ("H", "D", "D", "D", "D", "H", "H", "H", "H", "H"),
-    18: ("DS", "DS", "DS", "DS", "DS", "S", "S", "H", "H", "H"),
-    19: ("S", "S", "S", "S", "DS", "S", "S", "S", "S", "S"),
+    18: ("S", "DS", "DS", "DS", "DS", "S", "S", "H", "H", "H"),
+    19: ("S", "S", "S", "S", "S", "S", "S", "S", "S", "S"),
     20: ("S", "S", "S", "S", "S", "S", "S", "S", "S", "S"),
 }
 
@@ -65,7 +64,7 @@ PAIR_TOTALS: Final[dict[int | str, tuple[str, ...]]] = {
 
 
 class PublishedApproxCasinoStrategy:
-    """Published H17 multi-deck basic strategy constrained by house rules.
+    """Published S17 multi-deck basic strategy constrained by house rules.
 
     This is a starting baseline, not an exact solver-generated house-rule-optimal
     strategy.
@@ -74,22 +73,22 @@ class PublishedApproxCasinoStrategy:
     def choose_action(
         self,
         *,
-        table: TableState,
-        box: BoxState,
-        hand: HandState,
-        dealer_upcard: Card,
-        legal_actions: frozenset[ActionType],
+        decision: BlackjackDecisionState,
     ) -> GameAction:
         """Choose the best table action that is legal under house rules."""
-        _ = table
-        dealer_key = self._dealer_key(dealer_upcard)
-        strategy_code = self._strategy_code(hand, dealer_key, legal_actions)
-        action_type = self._resolve_code(strategy_code, hand, dealer_key, legal_actions)
-        return GameAction(
-            action_type=action_type,
-            box_id=box.box_id,
-            hand_id=hand.hand_id,
+        dealer_key = self._dealer_key(decision.dealer_upcard_rank)
+        strategy_code = self._strategy_code(
+            decision.player_ranks,
+            dealer_key,
+            decision.legal_actions,
         )
+        action_type = self._resolve_code(
+            strategy_code,
+            decision.player_ranks,
+            dealer_key,
+            decision.legal_actions,
+        )
+        return GameAction(action_type=action_type)
 
     def wants_insurance(self) -> bool:
         """Return whether this baseline takes insurance."""
@@ -101,24 +100,30 @@ class PublishedApproxCasinoStrategy:
 
     def _strategy_code(
         self,
-        hand: HandState,
+        player_ranks: tuple[Rank, ...],
         dealer_key: str,
         legal_actions: frozenset[ActionType],
     ) -> str:
         dealer_index = DEALER_UPCARDS.index(dealer_key)
 
-        if len(hand.cards) == 2 and split_value(hand.cards[0]) == split_value(
-            hand.cards[1]
-        ):
-            pair_code = PAIR_TOTALS[split_value(hand.cards[0])][dealer_index]
+        if len(player_ranks) == 2 and split_value_from_rank(
+            player_ranks[0]
+        ) == split_value_from_rank(player_ranks[1]):
+            pair_code = PAIR_TOTALS[split_value_from_rank(player_ranks[0])][
+                dealer_index
+            ]
             if pair_code != "P" or ActionType.SPLIT in legal_actions:
                 return pair_code
 
-        return self._total_strategy_code(hand, dealer_key)
+        return self._total_strategy_code(player_ranks, dealer_key)
 
-    def _total_strategy_code(self, hand: HandState, dealer_key: str) -> str:
+    def _total_strategy_code(
+        self,
+        player_ranks: tuple[Rank, ...],
+        dealer_key: str,
+    ) -> str:
         dealer_index = DEALER_UPCARDS.index(dealer_key)
-        value = hand_value(hand.cards)
+        value = hand_value_from_ranks(player_ranks)
         if value.is_soft and 13 <= value.total <= 20:
             return SOFT_TOTALS[value.total][dealer_index]
         if value.total >= 17:
@@ -128,7 +133,7 @@ class PublishedApproxCasinoStrategy:
     def _resolve_code(
         self,
         code: str,
-        hand: HandState,
+        player_ranks: tuple[Rank, ...],
         dealer_key: str,
         legal_actions: frozenset[ActionType],
     ) -> ActionType:
@@ -136,8 +141,8 @@ class PublishedApproxCasinoStrategy:
             if ActionType.SPLIT in legal_actions:
                 return ActionType.SPLIT
             return self._resolve_code(
-                self._total_strategy_code(hand, dealer_key),
-                hand,
+                self._total_strategy_code(player_ranks, dealer_key),
+                player_ranks,
                 dealer_key,
                 legal_actions,
             )
@@ -165,9 +170,9 @@ class PublishedApproxCasinoStrategy:
                 return action_type
         raise ValueError("Strategy received no usable legal action.")
 
-    def _dealer_key(self, dealer_upcard: Card) -> str:
-        if dealer_upcard.rank == "A":
+    def _dealer_key(self, dealer_upcard_rank: Rank) -> str:
+        if dealer_upcard_rank == "A":
             return "A"
-        if split_value(dealer_upcard) == 10:
+        if split_value_from_rank(dealer_upcard_rank) == 10:
             return "T"
-        return dealer_upcard.rank
+        return dealer_upcard_rank

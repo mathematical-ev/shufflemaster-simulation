@@ -1,14 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 from collections.abc import Iterable
 
 from shufflemaster_sim.actions import ActionType, GameAction
 from shufflemaster_sim.card_sources import ScriptedCardSource
 from shufflemaster_sim.cards import Card, Rank
-from shufflemaster_sim.games.casino_blackjack import CasinoBlackjackGame
+from shufflemaster_sim.games.casino_blackjack import (
+    CasinoBlackjackConfig,
+    CasinoBlackjackGame,
+)
 from shufflemaster_sim.hand_values import hand_value, is_natural_blackjack
-from shufflemaster_sim.state import BoxState, HandState, TableState
+from shufflemaster_sim.state import BlackjackDecisionState, TableState
 
 
 class QueueStrategy:
@@ -18,21 +20,18 @@ class QueueStrategy:
     def choose_action(
         self,
         *,
-        table: TableState,
-        box: BoxState,
-        hand: HandState,
-        dealer_upcard: Card,
-        legal_actions: frozenset[ActionType],
+        decision: BlackjackDecisionState,
     ) -> GameAction:
-        _ = table, box, hand, dealer_upcard
         action = self._actions.pop(0)
-        assert action in legal_actions
+        assert action in decision.legal_actions
         return GameAction(action_type=action)
 
 
 def play_round(cards: list[tuple[Rank, str]], actions: list[ActionType]) -> TableState:
     source = ScriptedCardSource(cards)
-    return CasinoBlackjackGame().play_round(
+    return CasinoBlackjackGame(
+        CasinoBlackjackConfig(burn_initial_card=False)
+    ).play_round(
         round_index=0,
         card_source=source,
         strategy=QueueStrategy(actions),
@@ -56,6 +55,26 @@ def test_player_blackjack_vs_dealer_non_blackjack_pays_three_to_two() -> None:
     assert [drawn.rank for drawn in table.dealer.cards] == ["9"]
     assert table.boxes[0].hands[0].is_collected
     assert [drawn.rank for drawn in table.discard_rack] == ["A", "K", "9"]
+
+
+def test_initial_burn_is_returned_after_first_initial_deal() -> None:
+    source = ScriptedCardSource(
+        [
+            ("2", "diamonds"),
+            ("A", "spades"),
+            ("6", "clubs"),
+            ("K", "hearts"),
+        ]
+    )
+    table = CasinoBlackjackGame().play_round(
+        round_index=0,
+        card_source=source,
+        strategy=QueueStrategy([]),
+    )
+
+    assert [card.rank for card in source.accepted_discard_batches[0]] == ["2"]
+    assert [card.rank for card in table.boxes[0].hands[0].cards] == ["A", "K"]
+    assert [card.rank for card in table.dealer.cards] == ["6"]
 
 
 def test_player_blackjack_pushes_against_dealer_blackjack() -> None:

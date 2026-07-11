@@ -1,11 +1,16 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
+import pytest
 from experiments.metrics import (
+    MonetaryStreakTracker,
+    classify_monetary_outcome,
     geometric_probabilities,
     hilo_value,
+    signed_streak_histogram_data,
     source_draw_metrics,
     streak_distributions,
+    streak_frequency_summary,
+    validate_streak_reconciliation,
 )
 from experiments.runners import (
     IidBaselineExperimentConfig,
@@ -109,3 +114,82 @@ def test_signed_streak_distribution_uses_negative_losses() -> None:
     streaks = streak_distributions([1, 1, -1, 0, -1])
 
     assert streaks["signed_streaks"] == {-2: 1, 2: 1}
+
+
+def test_all_pushes_create_no_streaks() -> None:
+    streaks = streak_distributions([0, 0, 0])
+
+    assert streaks["win_streaks"] == {}
+    assert streaks["loss_streaks"] == {}
+
+
+def test_leading_and_intervening_pushes_preserve_win_streak() -> None:
+    assert streak_distributions([0, 0, 1, 0, 1])["win_streaks"] == {2: 1}
+
+
+def test_pushes_do_not_break_open_win_or_loss_streaks() -> None:
+    tracker = MonetaryStreakTracker()
+    for outcome in (1, 0, 0, 1, -1, 0, 0, -1):
+        tracker.observe(outcome)
+
+    summary = tracker.summary()
+
+    assert summary["win_streaks"]["frequency"] == {2: 1}
+    assert summary["loss_streaks"]["frequency"] == {2: 1}
+
+
+def test_open_streak_is_finalized_after_trailing_pushes() -> None:
+    tracker = MonetaryStreakTracker()
+    for outcome in (1, 0, 0):
+        tracker.observe(outcome)
+
+    assert tracker.summary()["win_streaks"]["frequency"] == {1: 1}
+
+
+def test_monetary_outcome_classification() -> None:
+    assert classify_monetary_outcome(10.0) == "win"
+    assert classify_monetary_outcome(-10.0) == "loss"
+    assert classify_monetary_outcome(0.0) == "push"
+
+
+def test_streak_reconciliation_rejects_inconsistent_round_counts() -> None:
+    tracker = MonetaryStreakTracker()
+    tracker.observe(10.0)
+    summary = tracker.summary()
+    summary["rounds"] = 2
+
+    with pytest.raises(RuntimeError, match="Round outcome counts"):
+        validate_streak_reconciliation(summary)
+
+
+def test_signed_histogram_data_uses_signs_and_overflow_without_mutation() -> None:
+    wins = {1: 2, 4: 1, 21: 2, 30: 1}
+    losses = {2: 3, 20: 1, 22: 2}
+    original_wins = dict(wins)
+    original_losses = dict(losses)
+
+    histogram = signed_streak_histogram_data(wins, losses, display_limit=20)
+
+    assert histogram["counts"][1] == 2
+    assert histogram["counts"][4] == 1
+    assert histogram["counts"][21] == 3
+    assert histogram["counts"][-2] == 3
+    assert histogram["counts"][-20] == 1
+    assert histogram["counts"][-21] == 2
+    assert 0 not in histogram["counts"]
+    assert wins == original_wins
+    assert losses == original_losses
+
+
+def test_compact_streak_frequency_percentiles() -> None:
+    summary = streak_frequency_summary({1: 1, 2: 2, 4: 1})
+
+    assert summary["streak_count"] == 4
+    assert summary["represented_rounds"] == 9
+    assert summary["mean"] == 2.25
+    assert summary["median"] == 2.0
+    assert summary["p75"] == 2
+    assert summary["p90"] == 4
+    assert summary["p95"] == 4
+    assert summary["p99"] == 4
+    assert summary["maximum"] == 4

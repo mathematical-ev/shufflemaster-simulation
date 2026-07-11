@@ -1,12 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
+
+from dataclasses import fields
 
 import pytest
 
 from shufflemaster_sim.actions import ActionType
 from shufflemaster_sim.cards import Card, Rank
 from shufflemaster_sim.games.casino_blackjack import CasinoBlackjackGame
-from shufflemaster_sim.state import HandState
+from shufflemaster_sim.state import BlackjackDecisionState, HandState
 from shufflemaster_sim.strategies.published_casino_strategy import (
     PublishedApproxCasinoStrategy,
 )
@@ -34,11 +35,12 @@ def choose_action(player_cards: list[Rank], dealer_rank: Rank) -> ActionType:
     return (
         PublishedApproxCasinoStrategy()
         .choose_action(
-            table=table,
-            box=box,
-            hand=hand,
-            dealer_upcard=dealer_upcard,
-            legal_actions=legal_actions,
+            decision=BlackjackDecisionState(
+                player_ranks=tuple(player_cards),
+                dealer_upcard_rank=dealer_rank,
+                legal_actions=legal_actions,
+                is_split_hand=hand.is_split_hand,
+            )
         )
         .action_type
     )
@@ -52,16 +54,16 @@ def test_hard_sixteen_versus_dealer_six_stands() -> None:
     assert choose_action(["T", "6"], "6") == ActionType.STAND
 
 
-def test_hard_eleven_versus_dealer_ace_doubles_if_legal() -> None:
-    assert choose_action(["5", "6"], "A") == ActionType.DOUBLE
+def test_hard_eleven_versus_dealer_ace_hits_under_s17() -> None:
+    assert choose_action(["5", "6"], "A") == ActionType.HIT
 
 
 def test_soft_eighteen_versus_dealer_nine_hits() -> None:
     assert choose_action(["A", "7"], "9") == ActionType.HIT
 
 
-def test_soft_nineteen_versus_dealer_six_doubles_if_legal() -> None:
-    assert choose_action(["A", "8"], "6") == ActionType.DOUBLE
+def test_soft_nineteen_versus_dealer_six_stands_under_s17() -> None:
+    assert choose_action(["A", "8"], "6") == ActionType.STAND
 
 
 def test_soft_eighteen_versus_dealer_two_falls_back_to_stand() -> None:
@@ -107,11 +109,12 @@ def test_strategy_never_chooses_illegal_action(
     legal_actions = game.legal_actions(table=table, box=box, hand=hand)
 
     action = PublishedApproxCasinoStrategy().choose_action(
-        table=table,
-        box=box,
-        hand=hand,
-        dealer_upcard=dealer_upcard,
-        legal_actions=legal_actions,
+        decision=BlackjackDecisionState(
+            player_ranks=tuple(player_cards),
+            dealer_upcard_rank=dealer_rank,
+            legal_actions=legal_actions,
+            is_split_hand=hand.is_split_hand,
+        )
     )
 
     assert action.action_type in legal_actions
@@ -124,7 +127,7 @@ def test_strategy_declines_insurance_and_even_money() -> None:
     assert not strategy.wants_even_money()
 
 
-def test_strategy_uses_double_fallback_when_star_double_is_illegal() -> None:
+def test_strategy_uses_double_fallback_when_house_double_is_illegal() -> None:
     assert choose_action(["A", "7"], "2") == ActionType.STAND
 
 
@@ -140,12 +143,22 @@ def test_strategy_uses_pair_fallback_when_resplit_is_illegal() -> None:
     legal_actions = game.legal_actions(table=table, box=box, hand=hand)
 
     action = PublishedApproxCasinoStrategy().choose_action(
-        table=table,
-        box=box,
-        hand=hand,
-        dealer_upcard=dealer_upcard,
-        legal_actions=legal_actions,
+        decision=BlackjackDecisionState(
+            player_ranks=("8", "8"),
+            dealer_upcard_rank="T",
+            legal_actions=legal_actions,
+            is_split_hand=True,
+        )
     )
 
     assert ActionType.SPLIT not in legal_actions
     assert action.action_type == ActionType.HIT
+
+
+def test_strategy_decision_state_exposes_only_source_blind_game_information() -> None:
+    assert {field.name for field in fields(BlackjackDecisionState)} == {
+        "player_ranks",
+        "dealer_upcard_rank",
+        "legal_actions",
+        "is_split_hand",
+    }

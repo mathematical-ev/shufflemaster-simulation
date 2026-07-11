@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 Andrew Roudenko
 
 from pathlib import Path
 
 from experiments.plots import (
+    plot_comparative_signed_streak_histogram,
     plot_cumulative_profit,
     plot_interarrival_histogram,
     plot_outcome_percentages,
@@ -67,6 +67,19 @@ def test_plot_functions_create_png_files(tmp_path: Path) -> None:
         plot_cumulative_profit(
             [10.0, 0.0, 15.0],
             output_path=tmp_path / "cumulative_profit.png",
+        ),
+        plot_comparative_signed_streak_histogram(
+            {
+                "physical_iid": {
+                    "win_streaks": {"frequency": {1: 2, 21: 1}},
+                    "loss_streaks": {"frequency": {1: 1, 22: 1}},
+                },
+                "one2six": {
+                    "win_streaks": {"frequency": {1: 3, 2: 1}},
+                    "loss_streaks": {"frequency": {1: 2, 3: 1}},
+                },
+            },
+            output_path=tmp_path / "comparative_streaks.png",
         ),
     ]
 
