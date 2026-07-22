@@ -1,41 +1,252 @@
-# shufflemaster-sim
+# One2Six Advantage-Play Project
 
-`shufflemaster-sim` is a Python simulation project for blackjack-like card
-games. Its long-term purpose is to test whether continuous shuffling machines,
-especially Shuffle Master / One2Six-style devices, can create exploitable
-short-horizon structure.
+Python simulation and experiment code behind the MathematicalEV investigation into continuous shuffling machines, physical-card recurrence and player-observable blackjack signals.
 
-The first milestone is deliberately small: a clean project layout and a
-foundational card-source layer that can be tested independently from future game
-rules.
+The central question is simple:
 
-## Architecture Principles
+> Can a continuous shuffling mechanism retain enough short-horizon structure for information visible at the table to alter the expected value of the next deal?
 
-- Card dealing/card sources are separate from game mechanics.
-- Game rules are separate from player actions and strategies.
-- Player strategy is separate from legal-action validation.
-- Settlement/accounting is separate from card generation.
-- Randomness is injectable and reproducible.
-- Multiple games and card sources should fit behind explicit interfaces.
+The project models a configurable One2Six-style mechanism, tracks 312 persistent physical cards through the game and compares its output against explicit null and benchmark card sources.
 
-## Setup
+It does not assume that a machine is equivalent to IID sampling merely because its output looks noisy.
 
-Activate the existing local virtual environment:
+## Current Research Status
+
+The project has progressed through four broad stages:
+
+1. build and validate the blackjack engine;
+2. reconstruct a configurable One2Six-style card source;
+3. test whether the mechanism retains physical-card memory;
+4. determine whether that memory survives as information observable before a wager.
+
+The strongest published result so far is a player-observable fading-exclusion score based on visible discard history.
+
+On untouched validation seeds:
+
+- the score predicted the composition of the next deal;
+- low cards, ten-value cards and aces were predicted separately;
+- the strongest high-card-rich band occurred in just under 10% of rounds;
+- unconditional One2Six player edge was approximately `-0.462%`;
+- the strongest band improved to a point estimate of approximately `-0.002%`.
+
+By point estimate, the signal recovered approximately `99.6%` of the modelled house edge.
+
+The confidence interval crossed zero. This is therefore **not yet a validated positive-EV game**.
+
+The repository now extends beyond that published result into:
+
+- extreme-tail profitability;
+- score-conditioned player-action values;
+- monetary-streak dependence testing;
+- multi-box counterfactual analysis;
+- sensitivity to card-return timing and mechanism assumptions.
+
+No betting spread, playing deviation, multi-box strategy or operational advantage policy is currently treated as validated.
+
+## Important Boundaries
+
+This repository contains a model, not a reverse-engineered copy of proprietary firmware.
+
+The current One2Six source:
+
+- represents a mechanism family supported by public documentation and patents;
+- preserves physical-card identity;
+- models a feeder, carousel compartments, whole-shelf ejection and an output buffer;
+- exposes uncertain parameters through configuration;
+- does not claim that every production device uses the default settings.
+
+The project has not been validated against a physical production One2Six.
+
+Results should therefore be read as:
+
+> consequences of the stated model and assumptions,
+
+rather than:
+
+> claims about every real machine in operation.
+
+The work is for research and informational purposes. It is not gambling advice, does not guarantee profit and does not recommend using electronic devices or violating casino rules or applicable law.
+
+## Published Articles
+
+The accompanying articles explain the reasoning, model development, experiments and results in narrative form.
+
+- [MathematicalEV](https://www.mathematicalev.com/)
+- [Part 1: Why Question the Shuffle?](https://www.mathematicalev.com/blog-3-1/is-the-perfect-shuffle-a-myth-an-analysis-of-the-shufflemaster-one2six)
+- [Part 6: Short Physical-Card Returns Are Strongly Suppressed](https://www.mathematicalev.com/blog-3-1/is-the-perfect-shuffle-a-myth-part-6-the-mean-was-not-the-signal)
+- [Part 7: Discard History Predicts the Next Deal](https://www.mathematicalev.com/blog-3-1/is-the-perfect-shuffle-a-myth-part-7-the-signal-escapes-the-machine)
+
+The articles are the best place to begin. This repository contains the machinery underneath them.
+
+## Architecture
+
+The simulation separates the card-generating mechanism from the blackjack game and the experiments used to evaluate it.
+
+```mermaid
+flowchart LR
+    A[Card sources] --> B[Casino blackjack engine]
+    B --> C[Player strategy]
+    B --> D[Settlement and accounting]
+    B --> E[Discard collection and return timing]
+
+    A1[Physical IID] --> A
+    A2[Finite shoe] --> A
+    A3[Manual shoe] --> A
+    A4[One2Six-style source] --> A
+
+    A --> F[Experiment runners]
+    B --> F
+    E --> F
+
+    F --> G[Metrics]
+    F --> H[CSV and JSON outputs]
+    F --> I[Plots and summaries]
+```
+
+The main design principles are:
+
+- card sources are separate from game mechanics;
+- game rules are separate from player strategy;
+- strategy is separate from legal-action validation;
+- settlement is separate from card generation;
+- randomness is injectable and reproducible;
+- physical cards retain stable identities;
+- experiments live outside the core simulation package;
+- hidden source state is not exposed as a player predictor;
+- held-out seeds are used where a candidate signal or policy is evaluated.
+
+## Physical-Card Identity
+
+Cards carry two identifiers:
+
+- `physical_id`: the stable identity of the real card as it moves through the shoe, hand, discard rack, feeder, carousel and output buffer;
+- `draw_id`: the unique identity of a particular draw event.
+
+This distinction allows the simulator to measure whether the same physical card returns unusually quickly or slowly.
+
+A symbolic source can generate another ten of spades. It cannot determine whether it is the same physical ten of spades.
+
+## Card Sources
+
+### `IidRandomCardSource`
+
+A symbol-level IID source used for baseline game validation.
+
+Every draw is independent. It does not model a finite shoe or a physical shuffler.
+
+### `PhysicalIidCardSource`
+
+A null model over labelled physical cards.
+
+With six decks, every draw independently selects from all 312 physical identities with replacement. It is not intended to represent casino dealing. It is the memoryless comparator for physical-card recurrence.
+
+### `FiniteShoeCardSource`
+
+A finite collection of physical cards drawn without replacement until its reshuffle policy is triggered.
+
+### `ManualShoeCardSource`
+
+An eight-deck manual-shoe benchmark with configurable cut-card penetration.
+
+It does not reshuffle during a round and preserves physical identities across the shuffle.
+
+### `One2SixCardSource`
+
+A configurable continuous-shuffler approximation.
+
+It:
+
+- accepts ordered discard batches;
+- feeds returned cards into a carousel;
+- assigns cards to compartments;
+- ejects whole shelves;
+- places ejected cards into an output buffer;
+- draws from the front of that buffer;
+- records source-level telemetry;
+- preserves each card’s physical identity.
+
+Default parameters are modelling assumptions and can be changed.
+
+## Blackjack Model
+
+The current casino blackjack profile includes:
+
+- six physical decks for the main One2Six comparisons;
+- no dealer hole card during the initial deal;
+- blackjack paying `3:2`;
+- dealer standing on hard and soft 17;
+- doubling on 9, 10 or 11;
+- doubling after a split;
+- one card to split aces;
+- no ordinary resplitting;
+- original-wager-only treatment when the dealer later makes blackjack after a split or double;
+- an initial burn card;
+- ordered discard-rack collection;
+- return of the previous discard rack after the following initial deal when a shuffling device is used.
+
+The current fixed player strategy is a published approximate multi-deck S17 strategy constrained by the legal actions supported by the engine.
+
+It is not yet a solver-generated exact strategy for every rule and conditional card distribution.
+
+## Repository Layout
+
+```text
+.
+├── experiments/              # Metrics, experiment logic, plots and summaries
+├── scripts/                  # Command-line experiment runners
+├── src/
+│   └── shufflemaster_sim/    # Core cards, sources, game, strategy and settlement
+├── tests/                    # Unit and integration tests
+├── environment.yml
+├── pyproject.toml
+├── README.md
+└── LICENSE
+```
+
+## Requirements
+
+- Python `3.11` or later
+- No mandatory runtime dependencies for the core package
+- Optional development tools:
+  - pytest
+  - pytest-cov
+  - Ruff
+  - mypy
+- Optional analysis dependency:
+  - matplotlib
+
+## Installation
+
+Clone the repository:
 
 ```bash
+git clone https://github.com/mathematical-ev/shufflemaster-simulation.git
+cd shufflemaster-simulation
+```
+
+Create and activate a virtual environment:
+
+```bash
+python -m venv .venv
 source .venv/bin/activate
 ```
 
-Install development dependencies:
+On Windows:
+
+```powershell
+.venv\Scripts\activate
+```
+
+Install the project with development and analysis dependencies:
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+python -m pip install -e ".[dev,analysis]"
 ```
 
-## Development Commands
+## Quality Checks
 
-Run tests:
+Run the tests:
 
 ```bash
 python -m pytest
@@ -53,120 +264,59 @@ Check formatting:
 python -m ruff format --check .
 ```
 
-Apply formatting:
-
-```bash
-python -m ruff format .
-```
-
-Run type checks:
+Run strict type checking:
 
 ```bash
 python -m mypy src
 ```
 
-## Casino Blackjack Baseline
-
-Run the one-box IID Casino Blackjack baseline simulation:
+Apply Ruff formatting:
 
 ```bash
-python scripts/run_casino_blackjack_baseline.py --rounds 10000 --base-bet 10 --seed 42 --card-source iid
+python -m ruff format .
 ```
 
-Run the same baseline with a finite shuffled shoe:
+## Quick Start
+
+Run a one-box One2Six blackjack baseline:
 
 ```bash
-python scripts/run_casino_blackjack_baseline.py --rounds 10000 --base-bet 10 --seed 42 --card-source finite-shoe --deck-count 6
+python scripts/run_casino_blackjack_baseline.py \
+  --rounds 10000 \
+  --base-bet 10 \
+  --seed 42 \
+  --card-source one2six
 ```
 
-Run the manual shoe benchmark:
+Run source diagnostics without the blackjack engine:
 
 ```bash
-python scripts/run_casino_blackjack_baseline.py --rounds 10000 --base-bet 10 --seed 42 --card-source manual-shoe --deck-count 8 --cut-card-penetration 0.75
+python scripts/run_one2six_source_diagnostics.py \
+  --draws 100000 \
+  --seed 42
 ```
 
-Run the baseline with the configurable One2Six-style source model:
+Run the IID comparison:
 
 ```bash
-python scripts/run_casino_blackjack_baseline.py --rounds 10000 --base-bet 10 --seed 42 --card-source one2six
+python scripts/run_casino_blackjack_baseline.py \
+  --rounds 10000 \
+  --base-bet 10 \
+  --seed 42 \
+  --card-source iid
 ```
 
-Run the One2Six source diagnostic without the game engine:
+Each experiment runner supports:
 
 ```bash
-python scripts/run_one2six_source_diagnostics.py --draws 100000 --seed 42
+python scripts/<runner>.py --help
 ```
 
-The baseline uses a configurable base bet and defaults to `IidRandomCardSource`.
-It is structured so the card source can be replaced by a finite shoe, manual
-shoe, or One2Six-style source without changing the Casino Blackjack game rules.
+## Research Sequence
 
-`PublishedApproxCasinoStrategy` is a starting published S17 multi-deck basic
-strategy constrained by Casino Blackjack legal actions. It is not yet a
-solver-generated exact Casino Blackjack strategy.
+### 1. IID Baseline
 
-The current casino rule profile stands on every hard or soft 17. It also burns
-one card at the start of a game session and returns that burn through the same
-post-initial-deal discard path used for later rounds.
-
-The engine explicitly models ordered discard-rack collection and
-shuffling-device return timing. Current-round discards are staged for return
-only after the next round's initial deal, which matters for future One2Six-style
-card-source simulation.
-
-The current runnable simulation supports IID random cards, a generic
-finite-shoe source, a manual shoe benchmark, and a configurable One2Six-style
-source. It does not make exploitability claims; those require validated source
-models and simulation evidence.
-
-The current CLI still runs one box, but internally boxes are represented with
-independent wagers such as `box_bets = {1: 10.0}`. Per-box win/loss streaks are
-tracked by each box's net result per round. A neutral/push round does not break
-the active win or loss streak.
-
-## Card Sources And Identity
-
-`IidRandomCardSource` treats every draw as a new physical card. It is useful for
-baseline game-mechanics validation, but it is not a shoe or shuffler model.
-
-`FiniteShoeCardSource` builds a finite set of physical cards, shuffles them, and
-draws without replacement. Accepted discards are stored in order and are not
-drawable again until the shoe is empty and the explicit reshuffle policy returns
-the discard tray to the shoe.
-
-`ManualShoeCardSource` is the manual card-shoe benchmark. It defaults to eight
-decks and a configurable 75% cut-card penetration assumption. The cut-card
-threshold marks a shuffle for the next round; the source does not reshuffle in
-the middle of a round. On shuffle, remaining shoe cards and accepted discards
-are combined while preserving physical card identities.
-
-`One2SixCardSource` is a configurable approximation of a continuous shuffling
-machine source for return-time experiments. It preserves physical card identity,
-assigns a fresh `draw_id` on every draw, accepts ordered discard batches, feeds
-accepted cards into a carousel, ejects whole shelves into an output buffer, and
-records telemetry for source-level diagnostics. The default settings are
-modelling assumptions, not claims about proprietary device internals.
-
-Cards carry two identities:
-
-- `physical_id`: stable identity for the real card moving through shoe, hand,
-  discard rack, shuffler, and possible later redraw.
-- `draw_id`: unique identity for the specific draw event.
-
-## Experiments
-
-Experiment code lives outside the core package in `experiments/`. The core
-engine remains responsible for cards, card sources, game rules, strategies, and
-simulation mechanics. Experiments are responsible for controlled runs,
-aggregate metrics, baseline comparisons, plots, and output files.
-
-Install optional plotting dependencies with:
-
-```bash
-python -m pip install -e ".[dev,analysis]"
-```
-
-Run a smoke-sized IID baseline experiment:
+Validates source frequencies, game outcomes, player-blackjack denominators, profit accounting and recurrence metrics under a memoryless source.
 
 ```bash
 python scripts/run_iid_baseline_experiment.py \
@@ -177,136 +327,31 @@ python scripts/run_iid_baseline_experiment.py \
   --output-dir experiments/outputs/iid_smoke
 ```
 
-Run a larger IID baseline experiment:
+### 2. Single-Box Game Validation
 
-```bash
-python scripts/run_iid_baseline_experiment.py \
-  --source-draws 1000000 \
-  --game-rounds 1000000 \
-  --base-bet 10 \
-  --seed 42 \
-  --output-dir experiments/outputs/iid_1m_seed42
-```
-
-The IID source experiment tracks rank, suit, rank/suit, Hi-Lo, and target-card
-recurrence metrics. Specific target-card inter-arrival times such as `T:S` and
-`5:S` are compared to a geometric distribution with `p = 1 / 52`. Rank-level
-targets such as `T` and `5` use `p = 1 / 13`. Poisson approximations are only
-appropriate for fixed-window counts, not inter-arrival gaps.
-
-The IID game experiment runs one-box Casino Blackjack with IID cards and the
-published approximate baseline strategy. It reports outcome counts, percentages,
-profit path, edge per initial wager, and edge per total wager. Player blackjack
-rate is calculated as natural blackjacks divided by initial hands, not dollars
-wagered and not resolved hands after splits.
-
-Win/loss streak distributions use box net result per round. Pushes are ignored
-for streak continuation: `W, W, P, W` is a win streak of 3, and `L, L, P, L` is
-a loss streak of 3. Signed streak plots put losses on the negative x-axis and
-wins on the positive x-axis.
-
-## Single-Box Game Validation
-
-The single-box game validation compares six-deck `PhysicalIidCardSource` and
-`One2SixCardSource` runs using identical casino blackjack rules, one shared
-fixed strategy implementation, and a flat base wager. Only the card source
-changes. Its primary metrics are net result, original player blackjacks, actual
-double actions, and actual split actions.
-
-Split actions are decomposed into original equal-value pair opportunities,
-pair value, dealer upcard, and the fixed strategy's chosen action. Ten, jack,
-queen, and king share one ten-value pair category. Under physical IID, the
-theoretical original pair-opportunity probability is `25 / 169`, or about
-14.7929%.
-
-Round-profit variance and a naive round-level normal interval are recorded
-without retaining every round. Those intervals are descriptive because
-One2Six rounds may be serially dependent. Independent seed runs, summarized
-with Student-t intervals and paired source differences, are the primary
-uncertainty unit for monetary and event-rate comparisons.
-
-Monetary streaks classify each completed round from the total result of the
-active box after combining all original, split, doubled, blackjack, and other
-settled hand results. A positive box result is a win, a negative result is a
-loss, and zero is a push. Pushes do not count toward a streak and do not break
-an open streak. Every independent seed finalizes its open streak so streaks
-never continue across seed boundaries.
-
-The signed streak histogram places loss streaks on the negative axis and win
-streaks on the positive axis. Its display groups lengths beyond 20 into
-explicit overflow bins, while JSON and CSV output retain every observed streak
-length.
-
-Run a smoke comparison:
+Compares `PhysicalIidCardSource` and `One2SixCardSource` while holding game rules, strategy and wager constant.
 
 ```bash
 python scripts/run_single_box_game_validation.py \
   --rounds 10000 \
   --base-bet 10 \
   --seeds 42,43 \
-  --output-dir experiments/outputs/single_box_game_validation_split_smoke
+  --output-dir experiments/outputs/single_box_game_validation_smoke
 ```
 
-Run the 20-seed replication:
+Primary diagnostics include:
 
-```bash
-python scripts/run_single_box_game_validation.py \
-  --rounds 500000 \
-  --base-bet 10 \
-  --seeds 42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61 \
-  --output-dir experiments/outputs/single_box_game_validation_20x500k
-```
+- player edge;
+- blackjack rate;
+- split and double rates;
+- equal-value pair opportunities;
+- win, loss and push rates;
+- monetary streaks;
+- paired source differences.
 
-Run the five-seed monetary-streak validation:
+### 3. Physical-IID Recurrence Null
 
-```bash
-python scripts/run_single_box_game_validation.py \
-  --rounds 200000 \
-  --base-bet 10 \
-  --seeds 42,43,44,45,46 \
-  --output-dir experiments/outputs/single_box_game_validation_5x200k
-```
-
-Each run writes per-seed details plus `summary.json`, `summary.csv`, and
-`summary.md`, along with compact per-seed, pair decomposition, and monetary
-streak CSV files plus a signed streak histogram.
-This is a game-engine and source-integration validation, not an
-advantage-strategy experiment.
-
-## Six-Deck Physical IID Recurrence
-
-`PhysicalIidCardSource` is a mathematical null model over labelled physical
-cards. With six decks it has 312 stable physical IDs, but every draw is an
-independent random selection from that full population. There is no depletion,
-discard tray, replacement operation, cut card, shoe state, or shuffler state.
-This is not a casino shoe; it is the random baseline for physical-card
-recurrence comparisons.
-
-For one specific labelled physical card in the six-deck IID model,
-`p = 1 / 312`. Draw gaps follow a geometric distribution, and
-`cards_between = draw_gap - 1` follows:
-
-```text
-P(cards_between = n) = (1 - p) ** n * p
-```
-
-The recurrence `metrics.json` includes the run config, target physical IDs,
-plot paths, observed and theoretical tail probabilities, per-card appearance
-and return-count distributions, and binned observed-vs-expected diagnostics.
-The chi-square-style diagnostic is a descriptive residual summary only; it is
-not currently reported as a formal p-value or significance test.
-
-Run a smoke-sized recurrence experiment:
-
-```bash
-python scripts/run_physical_iid_recurrence_experiment.py \
-  --draws 10000 \
-  --deck-count 6 \
-  --seed 42 \
-  --output-dir experiments/outputs/physical_iid_smoke
-```
-
-Run the 1M-draw null model:
+Measures recurrence of labelled physical cards under independent sampling from the full six-deck population.
 
 ```bash
 python scripts/run_physical_iid_recurrence_experiment.py \
@@ -316,22 +361,17 @@ python scripts/run_physical_iid_recurrence_experiment.py \
   --output-dir experiments/outputs/physical_iid_6deck_1m_seed42
 ```
 
-## One2Six Recurrence Experiment
+For one specified physical card:
 
-The One2Six recurrence experiment is a source-level physical-card recurrence
-experiment. It does not run blackjack hands, estimate EV, optimize strategy, or
-make exploitability claims. It draws from `One2SixCardSource`, returns ordered
-discard batches through `accept_discards(...)`, and measures how many cards are
-dealt between repeated appearances of the same `physical_id`.
+```text
+p = 1 / 312
+```
 
-The six-deck physical IID model is used as the null comparator. One2Six
-recurrence is not assumed to be geometric; deviations from the physical IID
-curve should be interpreted as source-mechanism diagnostics, not as evidence of
-profitability. The output includes One2Six source diagnostics such as ejection
-counts, fallback ejection rate, ejection group sizes, final carousel occupancy,
-telemetry latency summaries, and discard-batch reappearance summaries.
+The number of cards between appearances follows the corresponding geometric waiting-time distribution.
 
-Run the 1M-draw One2Six recurrence experiment:
+### 4. One2Six Physical-Card Recurrence
+
+Measures how the configurable mechanism changes the same-card return distribution.
 
 ```bash
 python scripts/run_one2six_recurrence_experiment.py \
@@ -341,19 +381,13 @@ python scripts/run_one2six_recurrence_experiment.py \
   --output-dir experiments/outputs/one2six_recurrence_1m_seed42
 ```
 
-## One2Six Recycle-Batch Sensitivity
+The published batch-20 result reduced returns within 20 cards from approximately `6.52%` under physical IID to approximately `0.53%` under the One2Six model.
 
-The One2Six recurrence sensitivity experiment repeats the source-level
-recurrence experiment across multiple `recycle_batch_size` values. This matters
-because discard-return timing is a modelling assumption, and short-return
-behaviour should not be treated as robust if it only appears for one batch size.
+The average recurrence remained close to 311 cards because the delayed cards eventually returned.
 
-Each batch-size run writes its normal recurrence outputs into a subdirectory,
-and the parent output directory receives `summary.json`, `summary.csv`,
-`summary.md`, and aggregate plots. This remains source-level structure analysis,
-not blackjack EV or exploitability evidence.
+### 5. Recycle-Batch Sensitivity
 
-Run the 1M-draw sensitivity experiment:
+Tests whether the recurrence effect survives different card-return batch sizes.
 
 ```bash
 python scripts/run_one2six_recurrence_sensitivity.py \
@@ -363,86 +397,16 @@ python scripts/run_one2six_recurrence_sensitivity.py \
   --output-dir experiments/outputs/one2six_recurrence_sensitivity_1m_seed42
 ```
 
-## Multi-Box Counterfactual Action Values
+This matters because return timing is a modelling assumption. An effect that exists only at one convenient batch size is not robust.
 
-The multi-box counterfactual experiment estimates the value of the next round
-from a player-observable betting-boundary state. The current state is only the
-composition of the visible discard rack after the preceding round has settled
-and before that rack is returned during the next initial deal.
+### 6. Observable Card-Composition Response
 
-Each sampled state is cloned into branches that play one through seven boxes.
-All branches begin with identical source, RNG, buffer, carousel, feeder, game,
-and pending-rack state, then diverge naturally as different box counts consume
-different cards. Hidden state is used only to create identical counterfactual
-starting points. It is never exported as a predictor or exposed to the fixed
-player strategy.
+Tests whether visible discard composition predicts future low cards, neutral cards, ten-value cards and aces.
 
-`PhysicalIidCardSource` is the negative control: visible rack composition
-should not predict its next deal. The first research goal is to determine
-whether any observable conditional signal appears under One2Six while staying
-absent under Physical IID. This experiment does not select, optimize, or
-validate a box-count strategy.
+It separates:
 
-Run the smoke experiment:
-
-```bash
-python scripts/run_multi_box_counterfactual_experiment.py \
-  --states-per-seed 100 \
-  --seeds 42,43 \
-  --burn-in-rounds 100 \
-  --sample-interval-rounds 2 \
-  --base-bet 10 \
-  --output-dir experiments/outputs/multi_box_counterfactual_smoke
-```
-
-Run the five-seed exploratory experiment:
-
-```bash
-python scripts/run_multi_box_counterfactual_experiment.py \
-  --states-per-seed 2000 \
-  --seeds 42,43,44,45,46 \
-  --burn-in-rounds 1000 \
-  --sample-interval-rounds 5 \
-  --base-bet 10 \
-  --output-dir experiments/outputs/multi_box_counterfactual_5x2000
-```
-
-The compact action file contains visible rack features and branch outcomes
-only. Physical IDs, source internals, RNG state, buffers, shelves, feeder
-contents, and card sequences are deliberately excluded. Independent seeds are
-the primary uncertainty unit.
-
-## Observable Card-Composition Response
-
-The observable card-response experiment measures composition directly before
-using noisy blackjack profit as an endpoint. It separates two mechanisms:
-
-1. **Immediate current-rack exclusion:** at a betting boundary, the visible
-   rack remains outside the source while a cloned source emits the next 15
-   cards. Fifteen positions cover the complete initial deal for seven boxes.
-2. **Delayed returned-batch response:** after each observable discard batch is
-   accepted, prefix sums measure future composition at exact lags 1 through 15
-   and over bands extending to 1,000 dealt cards.
-
-Low cards, neutral cards, ten-value cards, and aces remain separate. Aces are
-not combined with ten-value cards because their later blackjack value depends
-on whether they appear in player or dealer positions. Hi-Lo remains an
-additional aggregate diagnostic.
-
-Response slopes compare observed future composition with the simple
-finite-removal benchmark implied by the visible batch. A slope near zero means
-little observable finite-removal response, a slope near one resembles direct
-perfectly mixed exclusion, and a negative slope indicates reversal or a
-re-entry wave. These are predictive diagnostics, not isolated-batch causal
-effects.
-
-Physical IID is the negative control and should show no persistent response.
-Previous unconditional monetary streak results were materially similar across
-sources, so monetary streaks are not predictor features here. This experiment
-is a precursor to evaluating a time-decaying machine-adjusted count, not a
-completed count or betting strategy.
-
-Run the smoke experiment:
+1. immediate exclusion while the current rack remains outside the source;
+2. delayed effects after a returned batch re-enters the machine.
 
 ```bash
 python scripts/run_observable_card_response_experiment.py \
@@ -457,59 +421,21 @@ python scripts/run_observable_card_response_experiment.py \
   --output-dir experiments/outputs/observable_card_response_smoke
 ```
 
-Run the five-seed experiment:
+### 7. Held-Out Fading-Exclusion Validation
 
-```bash
-python scripts/run_observable_card_response_experiment.py \
-  --seeds 42,43,44,45,46 \
-  --current-rack-states-per-seed 3000 \
-  --current-rack-burn-in-rounds 1000 \
-  --current-rack-sample-interval-rounds 5 \
-  --current-rack-probe-cards 15 \
-  --lag-rounds-per-seed 50000 \
-  --lag-burn-in-rounds 1000 \
-  --lag-horizon-cards 1000 \
-  --output-dir experiments/outputs/observable_card_response_5seed
+Combines observable card cohorts into one frozen score.
+
+The published kernel was developed on seeds 42 to 46:
+
+```text
+current visible rack             1.00
+returned 1-15 cards ago          0.75
+returned 16-50 cards ago         0.40
+returned 51-100 cards ago        0.20
+older returned batches           0.00
 ```
 
-## Held-Out Fading-Exclusion Validation
-
-The held-out experiment combines every active player-observable exclusion
-cohort into one frozen score. Its kernel was developed on seeds 42-46 and is
-validated without retuning on independent seeds 47-51:
-
-- current visible rack: `1.00`;
-- returned 1-15 dealt cards ago: `0.75`;
-- returned 16-50 dealt cards ago: `0.40`;
-- returned 51-100 dealt cards ago: `0.20`;
-- older returned batches: `0.00`.
-
-Each returned batch contributes to exactly one dealt-card age band. The score
-is calculated before the wager and before the next initial deal, while the
-current rack is still outside the source. Full current-rack exclusion therefore
-applies to the initial deal; it is not assumed to apply unchanged to later hit
-and dealer cards in the same round.
-
-The primary endpoint is the next 15 cards' composition. Initial player and
-dealer positions are also analysed, with aces kept separate from ten-value
-cards. Flat-bet full-round profit is secondary and exploratory. Monetary
-streaks are not predictors, Physical IID is the negative control, and this
-phase validates a candidate signal rather than selecting a strategy.
-
-Run a smoke validation:
-
-```bash
-python scripts/run_fading_exclusion_validation.py \
-  --seeds 47,48 \
-  --rounds-per-seed 2000 \
-  --burn-in-rounds 100 \
-  --probe-states-per-seed 100 \
-  --probe-cards 15 \
-  --base-bet 10 \
-  --output-dir experiments/outputs/fading_exclusion_validation_smoke
-```
-
-Run the full held-out validation:
+It was then tested without retuning on seeds 47 to 51.
 
 ```bash
 python scripts/run_fading_exclusion_validation.py \
@@ -522,40 +448,13 @@ python scripts/run_fading_exclusion_validation.py \
   --output-dir experiments/outputs/fading_exclusion_validation_heldout
 ```
 
-## Held-Out Conditional Profitability
+The score is calculated before the wager and before the next initial deal.
 
-This phase changes the primary endpoint from card composition to next-round
-player profit under the unchanged source-blind fixed strategy. The development
-stage uses One2Six scores from seeds 42-51 only to freeze the 10th, 30th, 70th,
-and 90th percentile score-band cutpoints. It does not inspect monetary results,
-game events, dealer outcomes, or validation seeds while defining those bands.
+### 8. Held-Out Conditional Profitability
 
-The same numerical cutpoints are then applied to fresh validation seeds 52-61
-for both One2Six and the Physical IID negative control. Continuous monetary
-response and conditional player edge are primary. Initial-deal composition is
-retained only as a mechanism check that the frozen bands still order future
-cards as expected. Monetary streaks and hidden source state are not predictors.
+Changes the primary endpoint from card composition to player profit.
 
-The fixed strategy is deliberately unchanged. Player-action optimization is a
-later research phase and is justified only if observable states first show
-credible conditional profitability. Such later strategy work may differ from
-ordinary basic strategy because the conditional expected card distribution is
-not necessarily the ordinary baseline distribution.
-
-Run a smoke experiment:
-
-```bash
-python scripts/run_conditional_profitability_experiment.py \
-  --development-seeds 42,43 \
-  --validation-seeds 52,53 \
-  --development-rounds-per-seed 2000 \
-  --validation-rounds-per-seed 5000 \
-  --burn-in-rounds 100 \
-  --base-bet 10 \
-  --output-dir experiments/outputs/conditional_profitability_smoke
-```
-
-Run the full held-out experiment:
+Development seeds define score-band cutpoints without using their monetary outcomes. Those frozen cutpoints are then applied to fresh validation seeds.
 
 ```bash
 python scripts/run_conditional_profitability_experiment.py \
@@ -568,44 +467,15 @@ python scripts/run_conditional_profitability_experiment.py \
   --output-dir experiments/outputs/conditional_profitability_validation
 ```
 
-## Score-Conditioned Player Actions
+`PhysicalIidCardSource` remains the negative control.
 
-The action-value phase evaluates legal player decisions from paired copies of
-the same complete game and card-source state. Natural one-box sessions continue
-under the unchanged fixed strategy; at each sampled decision, every legal action
-is forced once on an isolated branch and all later choices return to the fixed
-strategy. No revised strategy is deployed during state generation or reporting.
+The fixed player strategy is unchanged during this phase.
 
-Decision-time composition differs from the pre-bet score. The preceding rack
-has already returned after the complete initial deal and therefore enters the
-freshest returned age band. Every exposed player card across current split hands
-and the dealer upcard form a new full-weight table cohort. Hit and split cards
-enter that cohort before later decisions, while older returned batches age by
-dealt-card count. Each observable card or batch contributes exactly once.
+### 9. Score-Conditioned Player Actions
 
-Low-card, ten-value, and ace shifts remain separate. Development One2Six states
-on seeds 62-66 define feature-only composition cutpoints and candidate actions;
-held-out seeds 67-71 cannot add or alter candidates. Generic baseline strategy
-corrections are distinguished from One2Six-specific deviations. Improvements
-that reduce losses in poor states remain strategically relevant even when they
-do not create positive EV.
+Evaluates legal actions from paired copies of the same complete game and source state.
 
-Run a smoke experiment:
-
-```bash
-python scripts/run_score_conditioned_action_values.py \
-  --development-seeds 62,63 \
-  --validation-seeds 67,68 \
-  --decision-states-per-seed 500 \
-  --burn-in-rounds 100 \
-  --base-bet 10 \
-  --minimum-total-state-count 20 \
-  --minimum-per-seed-state-count 5 \
-  --minimum-seed-sign-count 2 \
-  --output-dir experiments/outputs/score_conditioned_action_values_smoke
-```
-
-Run the full experiment:
+Each legal action is forced once on an isolated branch. Later decisions return to the unchanged fixed strategy.
 
 ```bash
 python scripts/run_score_conditioned_action_values.py \
@@ -617,39 +487,18 @@ python scripts/run_score_conditioned_action_values.py \
   --output-dir experiments/outputs/score_conditioned_action_values
 ```
 
-## Monetary Streak Dependence Audit
+This phase distinguishes:
 
-Matching streak means or upper quantiles does not establish geometric run
-lengths or independent round outcomes. The streak audit compares complete win
-and loss run distributions, survival tails, and continuation probabilities
-against source-and-seed geometric benchmarks. Continuation probability is the
-primary shape diagnostic because an independent resolved-outcome process has a
-constant continuation probability at every run length.
+- generic corrections to the baseline strategy;
+- possible One2Six-specific deviations;
+- reductions in expected loss;
+- actions that genuinely cross into positive conditional value.
 
-Pushes are removed from the resolved W/L sequence used for geometric analysis,
-but they remain neutral in the live pre-bet streak: they neither increase nor
-break it. A run already active after burn-in is marked left-censored, and the
-final open run is right-censored. Those boundary runs are excluded from primary
-PMFs while still contributing to continuation risk sets wherever continuation
-is observable.
+No revised playing strategy is deployed during state generation.
 
-Physical IID is the required negative control. Live streak sign and length are
-retained as possible strategy features only if they improve contiguous
-held-out prediction beyond the unchanged frozen fading-exclusion score. This
-audit does not select a betting or playing policy.
+### 10. Monetary-Streak Dependence Audit
 
-Run a smoke audit:
-
-```bash
-python scripts/run_streak_dependence_audit.py \
-  --seeds 72,73 \
-  --rounds-per-seed 5000 \
-  --burn-in-rounds 100 \
-  --base-bet 10 \
-  --output-dir experiments/outputs/streak_dependence_audit_smoke
-```
-
-Run the full audit:
+Tests whether winning and losing streaks contain predictive information beyond the observable card-composition score.
 
 ```bash
 python scripts/run_streak_dependence_audit.py \
@@ -660,24 +509,20 @@ python scripts/run_streak_dependence_audit.py \
   --output-dir experiments/outputs/streak_dependence_audit_10x100k
 ```
 
-## Extreme-Tail Profitability
+The audit examines:
 
-The strongest broad high-rich decile approached break-even, so the next test
-uses frozen one-, 2.5-, five-, ten-, and twenty-percent tails to determine
-whether a rarer observable state becomes positive EV under the unchanged
-one-box strategy. Cutpoints use One2Six development scores only; monetary
-validation outcomes cannot alter them. Physical IID remains the negative
-control. Selective entry is the simplest possible advantage route, but it is
-not tested as a policy unless positive conditional EV first passes the strict
-held-out gate.
+- run-length distributions;
+- survival tails;
+- continuation probabilities;
+- geometric benchmarks;
+- transition behaviour;
+- outcome autocorrelation.
 
-Insurance is audited at its actual post-initial-deal decision boundary. Because
-this is a no-hole-card game, player hits, doubles, and splits can occur before
-the dealer's insured second card. Ace-up insurance and even money use the exact
-one-third break-even probability. Rules permit dealer-ten insurance at a
-one-eleventh threshold, but operational availability is unconfirmed. Monetary
-streaks are not strategy features, and this phase does not vary bets, actions,
-or box count.
+Pushes remain neutral in the live streak but are removed from the resolved win/loss sequence used for geometric analysis.
+
+### 11. Extreme-Tail Profitability
+
+Tests whether rarer observable states cross positive expectation under the unchanged one-box strategy.
 
 ```bash
 python scripts/run_extreme_tail_profitability.py \
@@ -690,8 +535,122 @@ python scripts/run_extreme_tail_profitability.py \
   --output-dir experiments/outputs/extreme_tail_profitability
 ```
 
-## License
+The experiment uses frozen:
+
+- 1% tails;
+- 2.5% tails;
+- 5% tails;
+- 10% tails;
+- 20% tails.
+
+Selective entry is considered only if positive conditional EV survives the held-out gate.
+
+## Experimental Discipline
+
+The project uses several safeguards against finding an edge that exists only because the analysis wanted one.
+
+### Explicit null models
+
+Different questions require different nulls.
+
+- Symbol-level IID validates ordinary game behaviour.
+- Physical IID validates recurrence over labelled cards.
+- A manual shoe provides a finite physical benchmark.
+- The One2Six model changes only the card-generating mechanism.
+
+### Development and held-out seeds
+
+Candidate scores, cutpoints and actions are developed on one set of seeds and evaluated on untouched seeds.
+
+Validation seeds cannot:
+
+- create a candidate;
+- change a score definition;
+- alter a cutpoint;
+- select an action;
+- rescue a failed result.
+
+### Player-observable features
+
+Hidden machine state can be used to clone identical counterfactual starting points.
+
+It is not exported as a predictor.
+
+Candidate player information is restricted to what would be observable at the relevant decision boundary, such as:
+
+- visible discard composition;
+- cards exposed on the table;
+- elapsed dealt-card age of previously returned batches;
+- legal game state.
+
+### Independent seeds as the uncertainty unit
+
+Round-level outcomes may be serially dependent under a stateful card source.
+
+Independent simulation seeds are therefore the primary unit for uncertainty estimates and source comparisons.
+
+### Negative results remain results
+
+The project has explicitly tested and closed hypotheses that did not survive:
+
+- ordinary monetary streaks did not provide useful incremental prediction;
+- physical-card identity is not itself player-observable;
+- a conditional composition signal does not automatically imply a profitable action;
+- a near-zero point estimate is not proof of positive expectation.
+
+## Outputs
+
+Experiment runners generally write some combination of:
+
+- `summary.md`
+- `summary.json`
+- `summary.csv`
+- compact per-seed CSV files
+- diagnostic plots
+- configuration metadata
+- source telemetry
+- validation metrics
+
+Output directories are specified explicitly through `--output-dir`.
+
+Large raw event histories are avoided where aggregate or streaming statistics are sufficient.
+
+## Reproducibility
+
+For a published result, record:
+
+- repository commit or release;
+- full command;
+- model configuration;
+- development seeds;
+- validation seeds;
+- output directory;
+- runtime environment;
+- generated summary files.
+
+Randomness is injected and seeded explicitly.
+
+Future article milestones should be tagged as repository releases so that the code corresponding to each published result remains recoverable.
+
+## Issues and Corrections
+
+This is an active investigation.
+
+Useful issues include:
+
+- reproducible bugs;
+- incorrect blackjack rules or settlement;
+- measurement-definition errors;
+- statistical concerns;
+- hidden leakage between development and validation;
+- public documentation relevant to One2Six-style mechanisms;
+- sensitivity analyses that should be added;
+- disagreements about what a result does or does not establish.
+
+An interesting result is not protected from criticism merely because I spent a long time computing it.
+
+## Licence
 
 This project is licensed under the GNU General Public License v3.0 or later.
 
-See [LICENSE](LICENSE) for the full license text.
+See [LICENSE](LICENSE) for the full licence text.
